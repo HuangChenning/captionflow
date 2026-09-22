@@ -11,6 +11,7 @@
 		07EDEAEBF5451ADCBC014774 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB635DCE7D96CDBBCF726E3B /* KeychainStore.swift */; };
 		0ECEAA69C4D2E1A3A201C515 /* Caption.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31F61C971CF9FAFBC8E0D8F /* Caption.swift */; };
 		17E992D9EA4F2114D1037F2B /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = C776286D4A1F55BBAF48E569 /* WhisperKit */; };
+		203AD19AB33E986E9FCF7407 /* CaptionPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 951AD348B0351334D6D749BB /* CaptionPipelineTests.swift */; };
 		28E596E8CE4B6371358B8E21 /* WhisperKitEnglishASR.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A7581D6B9FBAF7EA96A917 /* WhisperKitEnglishASR.swift */; };
 		30DB2BD0191FCB7CB5E9A81B /* EnglishASRTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05827D572AEC927FDBC7A995 /* EnglishASRTests.swift */; };
 		371D6894853704EBCF0EACEF /* AudioResamplerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21F25BAED70738E1C7808E0D /* AudioResamplerTests.swift */; };
@@ -26,6 +27,7 @@
 		A2E201778D16AF9E182A3A71 /* CaptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F95231801D92035FDEF44F73 /* CaptionTests.swift */; };
 		B5457F37C78BF7EBBD0DC1BB /* EnglishASR.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F1C4932952FDA194F4A766E /* EnglishASR.swift */; };
 		BA5E98171B9F39AF04BD60D6 /* AppSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCCACE71F234130995CFE19E /* AppSessionState.swift */; };
+		C0FB1576871AF225AC5D6B29 /* CaptionPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = B112E8DFE95C67C070068F97 /* CaptionPipeline.swift */; };
 		C132EA650D5D40B957996427 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF47A5672CBF12DC53007E02 /* SettingsView.swift */; };
 		C49A3913B9007C129095CBA1 /* KeychainStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E4864BDD458A23F7DFA98F2 /* KeychainStoreTests.swift */; };
 		DCABBABAF64FEEAE0514D285 /* CaptionFlowApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B236FF5638BE2088FFFEEA01 /* CaptionFlowApp.swift */; };
@@ -58,8 +60,10 @@
 		6F1C4932952FDA194F4A766E /* EnglishASR.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnglishASR.swift; sourceTree = "<group>"; };
 		81871EB100C24D59D7206106 /* SystemAudioSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioSource.swift; sourceTree = "<group>"; };
 		89AFB0FE2E99E0BBCD3E60E4 /* WhisperKitEnglishASRTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperKitEnglishASRTests.swift; sourceTree = "<group>"; };
+		951AD348B0351334D6D749BB /* CaptionPipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptionPipelineTests.swift; sourceTree = "<group>"; };
 		A14A21BAB6D6B778ED33F4DC /* Translator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Translator.swift; sourceTree = "<group>"; };
 		AE665300E20F373B58418EBB /* CaptionFlowTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CaptionFlowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B112E8DFE95C67C070068F97 /* CaptionPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptionPipeline.swift; sourceTree = "<group>"; };
 		B236FF5638BE2088FFFEEA01 /* CaptionFlowApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptionFlowApp.swift; sourceTree = "<group>"; };
 		B2489B151265B23DF2E697E7 /* LLMTranslator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMTranslator.swift; sourceTree = "<group>"; };
 		B7DD20B5499A81564E4506EA /* AudioResampler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioResampler.swift; sourceTree = "<group>"; };
@@ -120,6 +124,7 @@
 			isa = PBXGroup;
 			children = (
 				21F25BAED70738E1C7808E0D /* AudioResamplerTests.swift */,
+				951AD348B0351334D6D749BB /* CaptionPipelineTests.swift */,
 				F95231801D92035FDEF44F73 /* CaptionTests.swift */,
 				05827D572AEC927FDBC7A995 /* EnglishASRTests.swift */,
 				33A17F391FF272506D5F7CC7 /* FallbackTranslatorTests.swift */,
@@ -176,6 +181,7 @@
 			children = (
 				BCCACE71F234130995CFE19E /* AppSessionState.swift */,
 				F31F61C971CF9FAFBC8E0D8F /* Caption.swift */,
+				B112E8DFE95C67C070068F97 /* CaptionPipeline.swift */,
 			);
 			path = Domain;
 			sourceTree = "<group>";
@@ -268,6 +274,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				371D6894853704EBCF0EACEF /* AudioResamplerTests.swift in Sources */,
+				203AD19AB33E986E9FCF7407 /* CaptionPipelineTests.swift in Sources */,
 				A2E201778D16AF9E182A3A71 /* CaptionTests.swift in Sources */,
 				30DB2BD0191FCB7CB5E9A81B /* EnglishASRTests.swift in Sources */,
 				781394A8648B770B116DD7A9 /* FallbackTranslatorTests.swift in Sources */,
@@ -287,6 +294,7 @@
 				4138891065218DF34A98B30B /* AudioSource.swift in Sources */,
 				0ECEAA69C4D2E1A3A201C515 /* Caption.swift in Sources */,
 				DCABBABAF64FEEAE0514D285 /* CaptionFlowApp.swift in Sources */,
+				C0FB1576871AF225AC5D6B29 /* CaptionPipeline.swift in Sources */,
 				B5457F37C78BF7EBBD0DC1BB /* EnglishASR.swift in Sources */,
 				9B34C9E19C8C445019C460EB /* FallbackTranslator.swift in Sources */,
 				07EDEAEBF5451ADCBC014774 /* KeychainStore.swift in Sources */,
