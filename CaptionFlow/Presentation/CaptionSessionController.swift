@@ -41,8 +41,9 @@ final class CaptionSessionController: ObservableObject {
 
     private func makeTranslator() -> Translator {
         let defaults = UserDefaults.standard
-        let baseURLString = defaults.string(forKey: "llm.baseURL") ?? "https://api.openai.com/v1"
-        let model = defaults.string(forKey: "llm.model") ?? "gpt-4.1-mini"
+        let style = defaults.string(forKey: "llm.apiStyle").flatMap(LLMAPIStyle.init(rawValue:)) ?? .anthropic
+        let baseURLString = defaults.string(forKey: "llm.baseURL") ?? "https://api.minimaxi.com/anthropic"
+        let model = defaults.string(forKey: "llm.model") ?? "MiniMax-M3"
         let instruction = defaults.string(forKey: "llm.instruction")
             ?? "Translate English speech into concise, natural Simplified Chinese subtitles."
         let apiKey = (try? keychain.secret(for: "default")) ?? ""
@@ -53,7 +54,7 @@ final class CaptionSessionController: ObservableObject {
             return fallback
         }
         return FallbackTranslator(
-            primary: LLMTranslator(configuration: configuration, apiKey: apiKey),
+            primary: LLMTranslator(configuration: configuration, apiKey: apiKey, style: style),
             fallback: fallback
         )
     }

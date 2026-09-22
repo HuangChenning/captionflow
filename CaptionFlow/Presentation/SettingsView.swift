@@ -1,8 +1,9 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @AppStorage("llm.baseURL") private var baseURLString = "https://api.openai.com/v1"
-    @AppStorage("llm.model") private var model = "gpt-4.1-mini"
+    @AppStorage("llm.apiStyle") private var apiStyleRaw = LLMAPIStyle.anthropic.rawValue
+    @AppStorage("llm.baseURL") private var baseURLString = "https://api.minimaxi.com/anthropic"
+    @AppStorage("llm.model") private var model = "MiniMax-M3"
     @AppStorage("llm.instruction") private var instruction = "Translate English speech into concise, natural Simplified Chinese subtitles."
 
     @State private var apiKey = ""
@@ -16,6 +17,11 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 16) {
             Form {
                 Section("LLM") {
+                    Picker("API Style", selection: $apiStyleRaw) {
+                        ForEach(LLMAPIStyle.allCases) { style in
+                            Text(style.displayName).tag(style.rawValue)
+                        }
+                    }
                     TextField("Base URL", text: $baseURLString)
                     TextField("Model", text: $model)
                     TextEditor(text: $instruction)

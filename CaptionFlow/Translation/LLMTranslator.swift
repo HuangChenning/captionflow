@@ -11,33 +11,31 @@ struct LLMTranslator: Translator {
 
     private let configuration: LLMConfiguration
     private let apiKey: String
+    private let style: LLMAPIStyle
     private let performRequest: RequestPerformer
 
     init(
         configuration: LLMConfiguration,
         apiKey: String,
+        style: LLMAPIStyle = .anthropic,
         performRequest: @escaping RequestPerformer = { try await URLSession.shared.data(for: $0) }
     ) {
         self.configuration = configuration
         self.apiKey = apiKey
+        self.style = style
         self.performRequest = performRequest
     }
 
     func translate(_ text: String) async throws -> String {
         guard !apiKey.isEmpty else { throw LLMTranslatorError.emptyAPIKey }
 
-        var request = URLRequest(url: configuration.baseURL.appendingPathComponent("v1/messages"))
-        request.httpMethod = "POST"
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.setValue("application/json", forHTTPHeaderField: "content-type")
-        request.httpBody = try JSONEncoder().encode(
-            MessagesRequest(
-                model: configuration.model,
-                maxTokens: 1024,
-                messages: [Message(role: "user", content: "\(configuration.instruction)\n\n\(text)")]
-            )
-        )
+        let request: URLRequest
+        switch style {
+        case .anthropic:
+            request = try makeAnthropicRequest(text: text)
+        case .openAICompatible:
+            request = try makeOpenAIRequest(text: text)
+        }
 
         let (data, response) = try await performRequest(request)
         guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
@@ -45,8 +43,59 @@ struct LLMTranslator: Translator {
             throw LLMTranslatorError.httpStatus(status)
         }
 
-        let decoded = try JSONDecoder().decode(MessagesResponse.self, from: data)
+        switch style {
+        case .anthropic:
+            return try parseAnthropicResponse(data)
+        case .openAICompatible:
+            return try parseOpenAIResponse(data)
+        }
+    }
+
+    private func makeAnthropicRequest(text: String) throws -> URLRequest {
+        var request = URLRequest(url: configuration.baseURL.appendingPathComponent("v1/messages"))
+        request.httpMethod = "POST"
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.httpBody = try JSONEncoder().encode(
+            AnthropicMessagesRequest(
+                model: configuration.model,
+                maxTokens: 1024,
+                messages: [AnthropicMessage(role: "user", content: "\(configuration.instruction)\n\n\(text)")]
+            )
+        )
+        return request
+    }
+
+    private func parseAnthropicResponse(_ data: Data) throws -> String {
+        let decoded = try JSONDecoder().decode(AnthropicMessagesResponse.self, from: data)
         guard let translated = decoded.content.first(where: { $0.type == "text" })?.text,
+              !translated.isEmpty else {
+            throw LLMTranslatorError.emptyResponse
+        }
+        return translated
+    }
+
+    private func makeOpenAIRequest(text: String) throws -> URLRequest {
+        var request = URLRequest(url: configuration.baseURL.appendingPathComponent("chat/completions"))
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.httpBody = try JSONEncoder().encode(
+            OpenAIChatRequest(
+                model: configuration.model,
+                messages: [
+                    OpenAIMessage(role: "system", content: configuration.instruction),
+                    OpenAIMessage(role: "user", content: text)
+                ]
+            )
+        )
+        return request
+    }
+
+    private func parseOpenAIResponse(_ data: Data) throws -> String {
+        let decoded = try JSONDecoder().decode(OpenAIChatResponse.self, from: data)
+        guard let translated = decoded.choices.first?.message.content,
               !translated.isEmpty else {
             throw LLMTranslatorError.emptyResponse
         }
@@ -54,10 +103,10 @@ struct LLMTranslator: Translator {
     }
 }
 
-private struct MessagesRequest: Encodable {
+private struct AnthropicMessagesRequest: Encodable {
     let model: String
     let maxTokens: Int
-    let messages: [Message]
+    let messages: [AnthropicMessage]
 
     enum CodingKeys: String, CodingKey {
         case model
@@ -66,16 +115,34 @@ private struct MessagesRequest: Encodable {
     }
 }
 
-private struct Message: Codable {
+private struct AnthropicMessage: Codable {
     let role: String
     let content: String
 }
 
-private struct MessagesResponse: Decodable {
+private struct AnthropicMessagesResponse: Decodable {
     let content: [ContentBlock]
 }
 
 private struct ContentBlock: Decodable {
     let type: String
     let text: String?
+}
+
+private struct OpenAIChatRequest: Encodable {
+    let model: String
+    let messages: [OpenAIMessage]
+}
+
+private struct OpenAIMessage: Codable {
+    let role: String
+    let content: String
+}
+
+private struct OpenAIChatResponse: Decodable {
+    let choices: [OpenAIChoice]
+}
+
+private struct OpenAIChoice: Decodable {
+    let message: OpenAIMessage
 }

@@ -21,6 +21,7 @@
 		4138891065218DF34A98B30B /* AudioSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 514EB4CC5ABCC5B1D167846B /* AudioSource.swift */; };
 		5FA8DC68510E3BCBD30B8B8E /* LLMTranslatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3158AFF26F326699302A3453 /* LLMTranslatorTests.swift */; };
 		6951F3EC951CC0AF81F5C7A7 /* MicrophoneAudioSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A9DBD701D36B06F4FB759B /* MicrophoneAudioSource.swift */; };
+		71B5597CA394DC5E7BE0A207 /* LLMAPIStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E33080AA971AEC8571060D5 /* LLMAPIStyle.swift */; };
 		74D04E9497CDDB8E2B4D3B9E /* CaptionSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2263846C473B929D759ACB5 /* CaptionSessionView.swift */; };
 		781394A8648B770B116DD7A9 /* FallbackTranslatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33A17F391FF272506D5F7CC7 /* FallbackTranslatorTests.swift */; };
 		8390038F37A3DB9F345A6BEB /* Translator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14A21BAB6D6B778ED33F4DC /* Translator.swift */; };
@@ -54,6 +55,7 @@
 		05827D572AEC927FDBC7A995 /* EnglishASRTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnglishASRTests.swift; sourceTree = "<group>"; };
 		14EE5877A22E0CF18CB1C520 /* AppleTranslator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleTranslator.swift; sourceTree = "<group>"; };
 		21F25BAED70738E1C7808E0D /* AudioResamplerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioResamplerTests.swift; sourceTree = "<group>"; };
+		2E33080AA971AEC8571060D5 /* LLMAPIStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMAPIStyle.swift; sourceTree = "<group>"; };
 		313074BB2CA6514C6D98EBC5 /* FallbackTranslator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FallbackTranslator.swift; sourceTree = "<group>"; };
 		3158AFF26F326699302A3453 /* LLMTranslatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMTranslatorTests.swift; sourceTree = "<group>"; };
 		33A17F391FF272506D5F7CC7 /* FallbackTranslatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FallbackTranslatorTests.swift; sourceTree = "<group>"; };
@@ -150,6 +152,7 @@
 			children = (
 				14EE5877A22E0CF18CB1C520 /* AppleTranslator.swift */,
 				313074BB2CA6514C6D98EBC5 /* FallbackTranslator.swift */,
+				2E33080AA971AEC8571060D5 /* LLMAPIStyle.swift */,
 				4FA27123837B79EAA6F364FD /* LLMConfiguration.swift */,
 				B2489B151265B23DF2E697E7 /* LLMTranslator.swift */,
 				A14A21BAB6D6B778ED33F4DC /* Translator.swift */,
@@ -318,6 +321,7 @@
 				B5457F37C78BF7EBBD0DC1BB /* EnglishASR.swift in Sources */,
 				9B34C9E19C8C445019C460EB /* FallbackTranslator.swift in Sources */,
 				07EDEAEBF5451ADCBC014774 /* KeychainStore.swift in Sources */,
+				71B5597CA394DC5E7BE0A207 /* LLMAPIStyle.swift in Sources */,
 				F10881E78084D4CC09329F37 /* LLMConfiguration.swift in Sources */,
 				0606BCF283269A8439403A3C /* LLMTranslator.swift in Sources */,
 				6951F3EC951CC0AF81F5C7A7 /* MicrophoneAudioSource.swift in Sources */,
