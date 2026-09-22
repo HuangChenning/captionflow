@@ -20,6 +20,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.taihongteng.CaptionFlow
         GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: "CaptionFlow needs microphone access to generate live captions from your speech."
         CODE_SIGN_ENTITLEMENTS: CaptionFlow/CaptionFlow.entitlements
     dependencies:
       - package: ArgmaxOSS
