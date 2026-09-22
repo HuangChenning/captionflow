@@ -333,8 +333,8 @@ private struct ModelProfileSheet: View {
         isTesting = true
         Task {
             do {
-                let result = try await translator.translate("Hello")
-                testMessage = "连接成功：Hello → \(result)"
+                _ = try await translator.translate("Hello")
+                testMessage = "连接成功"
             } catch LLMTranslatorError.httpStatus(let status) {
                 errorMessage = "连接失败：HTTP \(status)，请检查 Base URL、模型名称和 API Key。"
             } catch {
