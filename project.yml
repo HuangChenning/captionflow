@@ -10,21 +10,32 @@ packages:
   ArgmaxOSS:
     url: https://github.com/argmaxinc/argmax-oss-swift.git
     exactVersion: 1.1.0
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle.git
+    exactVersion: 2.10.0
 targets:
   CaptionFlow:
     type: application
     platform: macOS
     sources:
       - CaptionFlow
+    info:
+      path: CaptionFlow/Info.plist
+      properties:
+        SUFeedURL: https://github.com/HuangChenning/captionflow/releases/latest/download/appcast.xml
+        SUPublicEDKey: cHLTdR7MXSu0PMNDulhYvwHhpmSuS4ILzm6ksbf8abE=
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.taihongteng.CaptionFlow
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_NSMicrophoneUsageDescription: "CaptionFlow needs microphone access to generate live captions from your speech."
         CODE_SIGN_ENTITLEMENTS: CaptionFlow/CaptionFlow.entitlements
     dependencies:
       - package: ArgmaxOSS
         product: WhisperKit
+      - package: Sparkle
   CaptionFlowTests:
     type: bundle.unit-test
     platform: macOS

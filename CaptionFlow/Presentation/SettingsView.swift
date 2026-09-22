@@ -1,7 +1,8 @@
+import Sparkle
 import SwiftUI
 
 private enum SettingsSection: String, CaseIterable, Identifiable {
-    case launch, textAppearance, display, translation, models, shortcuts, vocabulary, about
+    case launch, textAppearance, display, translation, models, shortcuts, vocabulary, updates, about
 
     var id: String { rawValue }
 
@@ -14,6 +15,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         case .models: return "模型"
         case .shortcuts: return "键盘快捷键"
         case .vocabulary: return "自定义词汇"
+        case .updates: return "软件更新"
         case .about: return "关于"
         }
     }
@@ -27,12 +29,15 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         case .models: return "cpu"
         case .shortcuts: return "keyboard"
         case .vocabulary: return "textformat.abc"
+        case .updates: return "arrow.triangle.2.circlepath"
         case .about: return "info.circle"
         }
     }
 }
 
 struct SettingsView: View {
+    let updater: SPUUpdater
+
     @State private var selection: SettingsSection? = .translation
 
     var body: some View {
@@ -47,6 +52,8 @@ struct SettingsView: View {
                 TranslationSettingsPane()
             case .models:
                 ModelSettingsPane()
+            case .updates:
+                UpdateSettingsPane(updater: updater)
             case let other:
                 PlaceholderSettingsPane(title: other.title)
             }
@@ -95,6 +102,50 @@ private struct TranslationSettingsPane: View {
         }
         .formStyle(.grouped)
         .navigationTitle("翻译设置")
+    }
+}
+
+private struct UpdateSettingsPane: View {
+    let updater: SPUUpdater
+
+    @State private var automaticallyChecks = false
+    @State private var lastCheckDate: Date?
+
+    private var versionText: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "-"
+        let build = info?["CFBundleVersion"] as? String ?? "-"
+        return "\(version) (\(build))"
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent("当前版本", value: versionText)
+                Toggle("自动检查更新", isOn: $automaticallyChecks)
+                    .onChange(of: automaticallyChecks) { _, isOn in
+                        updater.automaticallyChecksForUpdates = isOn
+                    }
+                LabeledContent("上次检查") {
+                    if let lastCheckDate {
+                        Text(lastCheckDate, format: .dateTime)
+                    } else {
+                        Text("从未")
+                    }
+                }
+            } footer: {
+                HStack {
+                    Spacer()
+                    CheckForUpdatesView(updater: updater)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle("软件更新")
+        .onAppear {
+            automaticallyChecks = updater.automaticallyChecksForUpdates
+            lastCheckDate = updater.lastUpdateCheckDate
+        }
     }
 }
 
