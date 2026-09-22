@@ -52,3 +52,5 @@ struct SettingsView: View {
         } catch {
             status = "Could not save the API key."
         }
+    }
+}
