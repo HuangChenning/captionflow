@@ -41,30 +41,32 @@ final class CaptionSessionController: ObservableObject {
 
     private func makeTranslator() -> Translator {
         let defaults = UserDefaults.standard
-        let style = defaults.string(forKey: "llm.apiStyle").flatMap(LLMAPIStyle.init(rawValue:)) ?? .anthropic
-        let baseURLString = defaults.string(forKey: "llm.baseURL") ?? "https://api.minimaxi.com/anthropic"
-        let model = defaults.string(forKey: "llm.model") ?? "MiniMax-M3"
         let instruction = defaults.string(forKey: "llm.instruction")
             ?? "Translate English speech into concise, natural subtitles."
-        let apiKey = (try? keychain.secret(for: "default")) ?? ""
         let targetLanguage = defaults.string(forKey: "translation.targetLanguage")
             .flatMap(TargetLanguage.init(rawValue:)) ?? .simplifiedChinese
+        let engineMode = defaults.string(forKey: "translation.engineMode")
+            .flatMap(TranslationEngineMode.init(rawValue:)) ?? .auto
 
         translationSessionHolder.updateTarget(targetLanguage.locale)
-
         let fallback = AppleTranslator(holder: translationSessionHolder)
-        guard let baseURL = URL(string: baseURLString),
-              let configuration = LLMConfiguration(baseURL: baseURL, model: model, instruction: instruction) else {
+
+        guard engineMode != .localOnly else { return fallback }
+
+        guard let selectedID = LLMProfileStore.selectedID,
+              let profile = LLMProfileStore.load().first(where: { $0.id == selectedID }),
+              let apiKey = try? keychain.secret(for: selectedID.uuidString), !apiKey.isEmpty,
+              let configuration = LLMConfiguration(baseURL: profile.baseURL, model: profile.model, instruction: instruction) else {
             return fallback
         }
-        return FallbackTranslator(
-            primary: LLMTranslator(
-                configuration: configuration,
-                apiKey: apiKey,
-                style: style,
-                targetLanguageName: targetLanguage.displayName
-            ),
-            fallback: fallback
+
+        let llmTranslator = LLMTranslator(
+            configuration: configuration,
+            apiKey: apiKey,
+            style: profile.apiStyle,
+            targetLanguageName: targetLanguage.displayName
         )
+
+        return engineMode == .llmOnly ? llmTranslator : FallbackTranslator(primary: llmTranslator, fallback: fallback)
     }
 }

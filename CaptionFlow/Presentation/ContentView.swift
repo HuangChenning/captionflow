@@ -2,7 +2,6 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var controller: CaptionSessionController
-    @State private var isSettingsPresented = false
 
     init(translationSessionHolder: TranslationSessionHolder) {
         _controller = StateObject(wrappedValue: CaptionSessionController(translationSessionHolder: translationSessionHolder))
@@ -27,9 +26,6 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 480, minHeight: 360)
-        .sheet(isPresented: $isSettingsPresented) {
-            SettingsView()
-        }
     }
 
     private var toolbar: some View {
@@ -62,9 +58,7 @@ struct ContentView: View {
             }
             .disabled(controller.isPreparing)
 
-            Button {
-                isSettingsPresented = true
-            } label: {
+            SettingsLink {
                 Image(systemName: "gearshape")
             }
         }

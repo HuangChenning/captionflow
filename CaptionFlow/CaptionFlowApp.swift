@@ -9,5 +9,9 @@ struct CaptionFlowApp: App {
             ContentView(translationSessionHolder: translationSessionHolder)
                 .background(AppleTranslationHostView(holder: translationSessionHolder))
         }
+        Settings {
+            SettingsView()
+        }
+        .windowResizability(.contentSize)
     }
 }
