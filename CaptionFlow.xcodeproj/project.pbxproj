@@ -7,10 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		07EDEAEBF5451ADCBC014774 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB635DCE7D96CDBBCF726E3B /* KeychainStore.swift */; };
 		0ECEAA69C4D2E1A3A201C515 /* Caption.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31F61C971CF9FAFBC8E0D8F /* Caption.swift */; };
 		A2E201778D16AF9E182A3A71 /* CaptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F95231801D92035FDEF44F73 /* CaptionTests.swift */; };
 		BA5E98171B9F39AF04BD60D6 /* AppSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCCACE71F234130995CFE19E /* AppSessionState.swift */; };
+		C49A3913B9007C129095CBA1 /* KeychainStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E4864BDD458A23F7DFA98F2 /* KeychainStoreTests.swift */; };
 		DCABBABAF64FEEAE0514D285 /* CaptionFlowApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B236FF5638BE2088FFFEEA01 /* CaptionFlowApp.swift */; };
+		F10881E78084D4CC09329F37 /* LLMConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FA27123837B79EAA6F364FD /* LLMConfiguration.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -26,9 +29,12 @@
 /* Begin PBXFileReference section */
 		432378C702CE5E73ABF227C4 /* CaptionFlow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CaptionFlow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		463515DB1914DE9551A9834F /* CaptionFlow.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CaptionFlow.entitlements; sourceTree = "<group>"; };
+		4FA27123837B79EAA6F364FD /* LLMConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMConfiguration.swift; sourceTree = "<group>"; };
+		5E4864BDD458A23F7DFA98F2 /* KeychainStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStoreTests.swift; sourceTree = "<group>"; };
 		AE665300E20F373B58418EBB /* CaptionFlowTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CaptionFlowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B236FF5638BE2088FFFEEA01 /* CaptionFlowApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptionFlowApp.swift; sourceTree = "<group>"; };
 		BCCACE71F234130995CFE19E /* AppSessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSessionState.swift; sourceTree = "<group>"; };
+		CB635DCE7D96CDBBCF726E3B /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		F31F61C971CF9FAFBC8E0D8F /* Caption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Caption.swift; sourceTree = "<group>"; };
 		F95231801D92035FDEF44F73 /* CaptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptionTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -40,8 +46,18 @@
 				463515DB1914DE9551A9834F /* CaptionFlow.entitlements */,
 				B236FF5638BE2088FFFEEA01 /* CaptionFlowApp.swift */,
 				D78D98B37025814A0BDA3A1B /* Domain */,
+				500C1648A8DFF924468F16EE /* Security */,
+				9C891F8AFE64CF4E1E67A70E /* Translation */,
 			);
 			path = CaptionFlow;
+			sourceTree = "<group>";
+		};
+		500C1648A8DFF924468F16EE /* Security */ = {
+			isa = PBXGroup;
+			children = (
+				CB635DCE7D96CDBBCF726E3B /* KeychainStore.swift */,
+			);
+			path = Security;
 			sourceTree = "<group>";
 		};
 		6595428E8045FF823AB1CFB9 = {
@@ -57,8 +73,17 @@
 			isa = PBXGroup;
 			children = (
 				F95231801D92035FDEF44F73 /* CaptionTests.swift */,
+				5E4864BDD458A23F7DFA98F2 /* KeychainStoreTests.swift */,
 			);
 			path = CaptionFlowTests;
+			sourceTree = "<group>";
+		};
+		9C891F8AFE64CF4E1E67A70E /* Translation */ = {
+			isa = PBXGroup;
+			children = (
+				4FA27123837B79EAA6F364FD /* LLMConfiguration.swift */,
+			);
+			path = Translation;
 			sourceTree = "<group>";
 		};
 		A3405BAB6BBAC12ED3DD3B22 /* Products */ = {
@@ -154,6 +179,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A2E201778D16AF9E182A3A71 /* CaptionTests.swift in Sources */,
+				C49A3913B9007C129095CBA1 /* KeychainStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -164,6 +190,8 @@
 				BA5E98171B9F39AF04BD60D6 /* AppSessionState.swift in Sources */,
 				0ECEAA69C4D2E1A3A201C515 /* Caption.swift in Sources */,
 				DCABBABAF64FEEAE0514D285 /* CaptionFlowApp.swift in Sources */,
+				07EDEAEBF5451ADCBC014774 /* KeychainStore.swift in Sources */,
+				F10881E78084D4CC09329F37 /* LLMConfiguration.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
