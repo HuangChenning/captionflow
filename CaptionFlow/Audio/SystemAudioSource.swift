@@ -59,26 +59,14 @@ private extension CMSampleBuffer {
             return nil
         }
 
-        var audioBufferList = AudioBufferList()
-        var blockBuffer: CMBlockBuffer?
-        var bufferListSize = 0
-
-        let status = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
-            self,
-            bufferListSizeNeededOut: &bufferListSize,
-            bufferListOut: &audioBufferList,
-            bufferListSize: MemoryLayout<AudioBufferList>.size,
-            blockBufferAllocator: nil,
-            blockBufferMemoryAllocator: nil,
-            flags: 0,
-            blockBufferOut: &blockBuffer
-        )
-        guard status == noErr,
-              let pcmBuffer = AVAudioPCMBuffer(pcmFormat: audioFormat, bufferListNoCopy: &audioBufferList) else {
-            return nil
+        // AudioBufferList is variable-length for multi-channel non-interleaved audio;
+        // withAudioBufferList sizes the allocation correctly, unlike a fixed-size struct.
+        var pcmBuffer: AVAudioPCMBuffer?
+        try? withAudioBufferList { audioBufferList, _ in
+            pcmBuffer = AVAudioPCMBuffer(pcmFormat: audioFormat, bufferListNoCopy: audioBufferList.unsafePointer)
         }
 
-        pcmBuffer.frameLength = AVAudioFrameCount(CMSampleBufferGetNumSamples(self))
+        pcmBuffer?.frameLength = AVAudioFrameCount(CMSampleBufferGetNumSamples(self))
         return pcmBuffer
     }
 }
