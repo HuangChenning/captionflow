@@ -8,6 +8,8 @@ struct SettingsView: View {
     @State private var apiKey = ""
     @State private var status = ""
 
+    @Environment(\.dismiss) private var dismiss
+
     private let keychain = KeychainStore(service: "com.taihongteng.CaptionFlow")
 
     var body: some View {
@@ -27,7 +29,15 @@ struct SettingsView: View {
                 Text(status)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Save", action: save)
+                Button("Cancel") {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+                Button("Done") {
+                    save()
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
             }
             .padding(.horizontal)
         }
