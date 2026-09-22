@@ -63,7 +63,7 @@ final class CaptionPipeline: ObservableObject {
     private func transcribeAndTranslate(_ samples: [Float]) async {
         do {
             let english = try await asr.transcribe(samples: samples)
-            guard !english.isEmpty else { return }
+            guard !english.isEmpty, !isNonSpeechTranscript(english) else { return }
 
             let caption = Caption(id: UUID(), english: english, chinese: nil, isProvisional: true, createdAt: .now)
             captions.append(caption)

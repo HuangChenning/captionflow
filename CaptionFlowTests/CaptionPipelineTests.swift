@@ -74,6 +74,27 @@ final class CaptionPipelineTests: XCTestCase {
         XCTAssertTrue(pipeline.captions.isEmpty)
     }
 
+    func testNonSpeechTranscriptDoesNotProduceCaption() async throws {
+        let audioSource = FakeAudioSource(chunks: [[0.1, 0.2, 0.3, 0.4]])
+        let asr = FakeASR { _ in "[Music]" }
+        let translator = FakeTranslator { _ in
+            XCTFail("must not translate a non-speech transcript")
+            return ""
+        }
+        let pipeline = CaptionPipeline(
+            audioSource: audioSource,
+            asr: asr,
+            translator: translator,
+            minChunkDuration: 1,
+            sampleRate: 4
+        )
+
+        await pipeline.start()
+        await pipeline.pumpTask?.value
+
+        XCTAssertTrue(pipeline.captions.isEmpty)
+    }
+
     func testTranscriptionErrorTransitionsToFailedAndStopsAudioSource() async throws {
         struct StubError: Error {}
         let audioSource = FakeAudioSource(chunks: [[0.1, 0.2, 0.3, 0.4]])

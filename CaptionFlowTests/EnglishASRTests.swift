@@ -8,4 +8,15 @@ final class EnglishASRTests: XCTestCase {
             "hello world"
         )
     }
+
+    func testIsNonSpeechTranscriptDetectsMusicTags() {
+        XCTAssertTrue(isNonSpeechTranscript("[Music]"))
+        XCTAssertTrue(isNonSpeechTranscript("(music playing)"))
+        XCTAssertTrue(isNonSpeechTranscript("♪ ♪"))
+    }
+
+    func testIsNonSpeechTranscriptAllowsRealSpeech() {
+        XCTAssertFalse(isNonSpeechTranscript("hello world"))
+        XCTAssertFalse(isNonSpeechTranscript(""))
+    }
 }
