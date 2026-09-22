@@ -374,7 +374,7 @@ Inject a fake PCM source, deterministic ASR, and URLProtocol translation respons
 
 Run: `xcodebuild test -scheme CaptionFlow -destination 'platform=macOS' -only-testing:CaptionFlowIntegrationTests/EndToEndSessionTests`
 
-- [ ] **Step 3: Wire dependencies through `TransApp`**
+- [ ] **Step 3: Wire dependencies through `CaptionFlowApp`**
 
 Create production implementations only in the composition root; inject fakes in tests. Configure the app privacy usage description for microphone and ensure no logs include URL query secrets, Authorization headers, or transcript content by default.
 

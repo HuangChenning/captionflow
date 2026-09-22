@@ -1,0 +1,29 @@
+name: CaptionFlow
+options:
+  deploymentTarget:
+    macOS: "14.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+targets:
+  CaptionFlow:
+    type: application
+    platform: macOS
+    sources:
+      - CaptionFlow
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.taihongteng.CaptionFlow
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_ENTITLEMENTS: CaptionFlow/CaptionFlow.entitlements
+  CaptionFlowTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - CaptionFlowTests
+    dependencies:
+      - target: CaptionFlow
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
