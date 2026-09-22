@@ -15,3 +15,4 @@ struct LLMConfiguration: Codable, Equatable {
         self.model = model
         self.instruction = instruction
     }
+}
