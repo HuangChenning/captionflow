@@ -6,15 +6,8 @@ struct CaptionFlowApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(translationSessionHolder: translationSessionHolder)
                 .background(AppleTranslationHostView(holder: translationSessionHolder))
         }
-    }
-}
-
-private struct ContentView: View {
-    var body: some View {
-        Text("CaptionFlow")
-            .frame(minWidth: 360, minHeight: 240)
     }
 }
