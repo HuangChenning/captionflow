@@ -19,6 +19,12 @@ final class TranslationSessionHolder: ObservableObject {
         waiters.removeAll()
     }
 
+    func updateTarget(_ language: Locale.Language) {
+        guard let source = configuration?.source else { return }
+        session = nil
+        configuration = TranslationSession.Configuration(source: source, target: language)
+    }
+
     func session() async -> TranslationSession {
         if let session { return session }
         return await withCheckedContinuation { waiters.append($0) }

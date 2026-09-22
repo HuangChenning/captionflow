@@ -12,17 +12,20 @@ struct LLMTranslator: Translator {
     private let configuration: LLMConfiguration
     private let apiKey: String
     private let style: LLMAPIStyle
+    private let targetLanguageName: String
     private let performRequest: RequestPerformer
 
     init(
         configuration: LLMConfiguration,
         apiKey: String,
         style: LLMAPIStyle = .anthropic,
+        targetLanguageName: String = TargetLanguage.simplifiedChinese.displayName,
         performRequest: @escaping RequestPerformer = { try await URLSession.shared.data(for: $0) }
     ) {
         self.configuration = configuration
         self.apiKey = apiKey
         self.style = style
+        self.targetLanguageName = targetLanguageName
         self.performRequest = performRequest
     }
 
@@ -51,6 +54,10 @@ struct LLMTranslator: Translator {
         }
     }
 
+    private var systemInstruction: String {
+        "\(configuration.instruction)\n\nTarget language: \(targetLanguageName)."
+    }
+
     private func makeAnthropicRequest(text: String) throws -> URLRequest {
         var request = URLRequest(url: configuration.baseURL.appendingPathComponent("v1/messages"))
         request.httpMethod = "POST"
@@ -61,7 +68,7 @@ struct LLMTranslator: Translator {
             AnthropicMessagesRequest(
                 model: configuration.model,
                 maxTokens: 1024,
-                messages: [AnthropicMessage(role: "user", content: "\(configuration.instruction)\n\n\(text)")]
+                messages: [AnthropicMessage(role: "user", content: "\(systemInstruction)\n\n\(text)")]
             )
         )
         return request
@@ -85,7 +92,7 @@ struct LLMTranslator: Translator {
             OpenAIChatRequest(
                 model: configuration.model,
                 messages: [
-                    OpenAIMessage(role: "system", content: configuration.instruction),
+                    OpenAIMessage(role: "system", content: systemInstruction),
                     OpenAIMessage(role: "user", content: text)
                 ]
             )

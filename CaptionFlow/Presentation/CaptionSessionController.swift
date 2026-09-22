@@ -45,8 +45,12 @@ final class CaptionSessionController: ObservableObject {
         let baseURLString = defaults.string(forKey: "llm.baseURL") ?? "https://api.minimaxi.com/anthropic"
         let model = defaults.string(forKey: "llm.model") ?? "MiniMax-M3"
         let instruction = defaults.string(forKey: "llm.instruction")
-            ?? "Translate English speech into concise, natural Simplified Chinese subtitles."
+            ?? "Translate English speech into concise, natural subtitles."
         let apiKey = (try? keychain.secret(for: "default")) ?? ""
+        let targetLanguage = defaults.string(forKey: "translation.targetLanguage")
+            .flatMap(TargetLanguage.init(rawValue:)) ?? .simplifiedChinese
+
+        translationSessionHolder.updateTarget(targetLanguage.locale)
 
         let fallback = AppleTranslator(holder: translationSessionHolder)
         guard let baseURL = URL(string: baseURLString),
@@ -54,7 +58,12 @@ final class CaptionSessionController: ObservableObject {
             return fallback
         }
         return FallbackTranslator(
-            primary: LLMTranslator(configuration: configuration, apiKey: apiKey, style: style),
+            primary: LLMTranslator(
+                configuration: configuration,
+                apiKey: apiKey,
+                style: style,
+                targetLanguageName: targetLanguage.displayName
+            ),
             fallback: fallback
         )
     }
