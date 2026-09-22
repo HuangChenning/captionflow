@@ -17,8 +17,10 @@
 		28E596E8CE4B6371358B8E21 /* WhisperKitEnglishASR.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A7581D6B9FBAF7EA96A917 /* WhisperKitEnglishASR.swift */; };
 		2EDD70800DD192FE95F1A8E8 /* CaptionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C484714A45FE7851E7800D5 /* CaptionListView.swift */; };
 		30DB2BD0191FCB7CB5E9A81B /* EnglishASRTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05827D572AEC927FDBC7A995 /* EnglishASRTests.swift */; };
+		35AF7EFE741405F61BEB2DA1 /* CheckForUpdatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 381A4D0103D1DF8B295F52D0 /* CheckForUpdatesView.swift */; };
 		36C6571FC73FDD3B71FDA07A /* CaptionSessionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C84F030DE58784F9AAC282F /* CaptionSessionController.swift */; };
 		371D6894853704EBCF0EACEF /* AudioResamplerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21F25BAED70738E1C7808E0D /* AudioResamplerTests.swift */; };
+		3E3D481E34908BFAD07EB099 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 63CCA6369203D05DB8C79CC2 /* Sparkle */; };
 		4138891065218DF34A98B30B /* AudioSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 514EB4CC5ABCC5B1D167846B /* AudioSource.swift */; };
 		5FA8DC68510E3BCBD30B8B8E /* LLMTranslatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3158AFF26F326699302A3453 /* LLMTranslatorTests.swift */; };
 		6951F3EC951CC0AF81F5C7A7 /* MicrophoneAudioSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A9DBD701D36B06F4FB759B /* MicrophoneAudioSource.swift */; };
@@ -63,6 +65,7 @@
 		313074BB2CA6514C6D98EBC5 /* FallbackTranslator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FallbackTranslator.swift; sourceTree = "<group>"; };
 		3158AFF26F326699302A3453 /* LLMTranslatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMTranslatorTests.swift; sourceTree = "<group>"; };
 		33A17F391FF272506D5F7CC7 /* FallbackTranslatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FallbackTranslatorTests.swift; sourceTree = "<group>"; };
+		381A4D0103D1DF8B295F52D0 /* CheckForUpdatesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckForUpdatesView.swift; sourceTree = "<group>"; };
 		432378C702CE5E73ABF227C4 /* CaptionFlow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CaptionFlow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		463515DB1914DE9551A9834F /* CaptionFlow.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CaptionFlow.entitlements; sourceTree = "<group>"; };
 		4C484714A45FE7851E7800D5 /* CaptionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptionListView.swift; sourceTree = "<group>"; };
@@ -91,6 +94,7 @@
 		CB635DCE7D96CDBBCF726E3B /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		CF47A5672CBF12DC53007E02 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		D1A9DBD701D36B06F4FB759B /* MicrophoneAudioSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophoneAudioSource.swift; sourceTree = "<group>"; };
+		F22E683BD42B3BE1B3F3AAC6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		F31F61C971CF9FAFBC8E0D8F /* Caption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Caption.swift; sourceTree = "<group>"; };
 		F95231801D92035FDEF44F73 /* CaptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptionTests.swift; sourceTree = "<group>"; };
 		FFCB3613E780AA8EFFAEBC99 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -102,6 +106,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				17E992D9EA4F2114D1037F2B /* WhisperKit in Frameworks */,
+				3E3D481E34908BFAD07EB099 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -113,6 +118,7 @@
 			children = (
 				463515DB1914DE9551A9834F /* CaptionFlow.entitlements */,
 				B236FF5638BE2088FFFEEA01 /* CaptionFlowApp.swift */,
+				F22E683BD42B3BE1B3F3AAC6 /* Info.plist */,
 				CE655A7724BDA1D0A1A3BA8C /* ASR */,
 				C002A0F9D94F973E1455BA07 /* Audio */,
 				D78D98B37025814A0BDA3A1B /* Domain */,
@@ -218,6 +224,7 @@
 				4C484714A45FE7851E7800D5 /* CaptionListView.swift */,
 				5C84F030DE58784F9AAC282F /* CaptionSessionController.swift */,
 				C2263846C473B929D759ACB5 /* CaptionSessionView.swift */,
+				381A4D0103D1DF8B295F52D0 /* CheckForUpdatesView.swift */,
 				FFCB3613E780AA8EFFAEBC99 /* ContentView.swift */,
 				CF47A5672CBF12DC53007E02 /* SettingsView.swift */,
 			);
@@ -259,6 +266,7 @@
 			name = CaptionFlow;
 			packageProductDependencies = (
 				C776286D4A1F55BBAF48E569 /* WhisperKit */,
+				63CCA6369203D05DB8C79CC2 /* Sparkle */,
 			);
 			productName = CaptionFlow;
 			productReference = 432378C702CE5E73ABF227C4 /* CaptionFlow.app */;
@@ -286,6 +294,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				D90594807FCE8FB6CB2EBD89 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */,
+				82B15793B37BCA34C126C8CF /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A3405BAB6BBAC12ED3DD3B22 /* Products */;
@@ -329,6 +338,7 @@
 				C0FB1576871AF225AC5D6B29 /* CaptionPipeline.swift in Sources */,
 				36C6571FC73FDD3B71FDA07A /* CaptionSessionController.swift in Sources */,
 				74D04E9497CDDB8E2B4D3B9E /* CaptionSessionView.swift in Sources */,
+				35AF7EFE741405F61BEB2DA1 /* CheckForUpdatesView.swift in Sources */,
 				1829F96FD8145A5D41A7E98C /* ContentView.swift in Sources */,
 				B5457F37C78BF7EBBD0DC1BB /* EnglishASR.swift in Sources */,
 				9B34C9E19C8C445019C460EB /* FallbackTranslator.swift in Sources */,
@@ -381,12 +391,15 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = CaptionFlow/CaptionFlow.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CaptionFlow/Info.plist;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "CaptionFlow needs microphone access to generate live captions from your speech.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.taihongteng.CaptionFlow;
 				SDKROOT = macosx;
 			};
@@ -398,12 +411,15 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = CaptionFlow/CaptionFlow.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CaptionFlow/Info.plist;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "CaptionFlow needs microphone access to generate live captions from your speech.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.taihongteng.CaptionFlow;
 				SDKROOT = macosx;
 			};
@@ -577,6 +593,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		82B15793B37BCA34C126C8CF /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle.git";
+			requirement = {
+				kind = exactVersion;
+				version = 2.10.0;
+			};
+		};
 		D90594807FCE8FB6CB2EBD89 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/argmaxinc/argmax-oss-swift.git";
@@ -588,6 +612,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		63CCA6369203D05DB8C79CC2 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 82B15793B37BCA34C126C8CF /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
 		C776286D4A1F55BBAF48E569 /* WhisperKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = D90594807FCE8FB6CB2EBD89 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */;

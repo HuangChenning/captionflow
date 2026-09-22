@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install xcodegen
+        run: brew install xcodegen
+      - name: Generate project
+        run: xcodegen generate
+      # 版本号取自标签（v0.2.0 -> 0.2.0）；构建号用 run_number，保证递增，Sparkle 以它判断新旧。
+      - name: Build app
+        run: |
+          xcodebuild -scheme CaptionFlow -configuration Release -destination 'platform=macOS' \
+            -derivedDataPath build \
+            MARKETING_VERSION="${GITHUB_REF_NAME#v}" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            CODE_SIGN_IDENTITY=- \
+            build
+      - name: Package
+        run: |
+          mkdir dist
+          ditto -c -k --sequesterRsrc --keepParent \
+            build/Build/Products/Release/CaptionFlow.app \
+            "dist/CaptionFlow-${GITHUB_REF_NAME#v}.zip"
+      - name: Generate appcast
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          echo "$SPARKLE_PRIVATE_KEY" | build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_appcast \
+            --ed-key-file - \
+            --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/" \
+            dist
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/appcast.xml \
+            --title "$GITHUB_REF_NAME" --generate-notes
