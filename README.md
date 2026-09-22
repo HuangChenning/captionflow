@@ -31,12 +31,14 @@ CaptionFlow is designed for people following English videos, livestreams, podcas
 - HTTPS-only OpenAI-compatible LLM configuration screen.
 - Keychain-backed API key persistence.
 - WhisperKit `v1.1.0` dependency pinned for Apple Silicon local ASR.
-- Unit tests for caption identity, keychain storage, LLM validation, and transcript normalization.
+- LLM translation backend calling an Anthropic Messages-compatible endpoint.
+- On-device Translation framework backend used as a fallback when the LLM is slow, with the LLM result revising the line once it arrives.
+- Unit tests for caption identity, keychain storage, LLM validation, transcript normalization, and the fallback translation logic.
 
 ## Requirements
 
 - Apple Silicon Mac
-- macOS 14 Sonoma or later
+- macOS 15 Sequoia or later (required by the on-device Translation framework fallback)
 - Xcode 16 or later (Xcode 27 is used by this project)
 
 ## Installation

@@ -31,12 +31,14 @@ CaptionFlow 面向需要理解英文视频、直播、播客和会议的人群�
 - 仅接受 HTTPS 的 OpenAI 兼容 LLM 设置界面。
 - 基于 Keychain 的 API Key 安全存储。
 - 已锁定 WhisperKit `v1.1.0`，用于 Apple Silicon 本地 ASR。
-- 覆盖字幕身份、Keychain 存储、LLM 校验和文本规范化的单元测试。
+- LLM 翻译后端，调用兼容 Anthropic Messages 格式的端点。
+- 系统本地 Translation framework 作为翻译回退：LLM 超时未返回时先用本地翻译顶上，LLM 结果到达后再修订该行。
+- 覆盖字幕身份、Keychain 存储、LLM 校验、文本规范化和翻译回退逻辑的单元测试。
 
 ## 环境要求
 
 - Apple Silicon Mac
-- macOS 14 Sonoma 或更高版本
+- macOS 15 Sequoia 或更高版本（本地翻译回退依赖系统 Translation framework）
 - Xcode 16 或更高版本（本项目当前使用 Xcode 27）
 
 ## 安装与使用
