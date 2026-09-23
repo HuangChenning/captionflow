@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <title>CaptionFlow</title>
+  <desc>A speech bubble holding an English line and a highlighted translated line.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4A6B94"/>
+      <stop offset="1" stop-color="#26354A"/>
+    </linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <path d="M290 270 H734 A90 90 0 0 1 824 360 V620 A90 90 0 0 1 734 710 H440 L330 800 V710 H290 A90 90 0 0 1 200 620 V360 A90 90 0 0 1 290 270 Z" fill="#1A212C"/>
+  <rect x="290" y="400" width="300" height="40" rx="20" fill="#AEB8C6"/>
+  <rect x="290" y="500" width="444" height="72" rx="36" fill="#FFD84D"/>
+</svg>
