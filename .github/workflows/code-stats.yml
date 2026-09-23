@@ -1,0 +1,34 @@
+name: Code stats
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  lines-of-code:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # 统计 Swift 源码和测试的代码行（不含空行和注释），生成 shields.io endpoint 徽章数据。
+      - name: Count lines of code
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q cloc
+          lines=$(cloc CaptionFlow CaptionFlowTests --include-lang=Swift --json | jq '.Swift.code')
+          mkdir badge
+          jq -n --arg lines "$lines" \
+            '{schemaVersion: 1, label: "lines of code", message: $lines, color: "blue"}' > badge/loc.json
+          cat badge/loc.json
+      # 徽章数据单独放在 badges 分支，只保留一个提交，不往 main 加提交。
+      - name: Publish badge data
+        run: |
+          cd badge
+          git init -q -b badges
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add loc.json
+          git commit -q -m "Update lines of code badge"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" badges
