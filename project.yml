@@ -19,6 +19,8 @@ targets:
     platform: macOS
     sources:
       - CaptionFlow
+    configFiles:
+      Debug: Config/Signing.xcconfig
     info:
       path: CaptionFlow/Info.plist
       properties:
