@@ -4,3 +4,4 @@ CLAUDE.md
 xcshareddata/
 internal/
 Config/Signing.local.xcconfig
+*.profraw
