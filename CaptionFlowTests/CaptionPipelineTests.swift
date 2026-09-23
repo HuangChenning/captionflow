@@ -31,6 +31,74 @@ final class CaptionPipelineTests: XCTestCase {
         XCTAssertFalse(pipeline.captions[0].isProvisional)
     }
 
+    func testLocalDraftShowsFirstThenRefinerReplacesIt() async throws {
+        let gate = Gate()
+        let pipeline = CaptionPipeline(
+            audioSource: FakeAudioSource(chunks: [[0.1, 0.2, 0.3, 0.4]]),
+            asr: FakeASR { _ in "hello" },
+            translator: FakeTranslator { _ in "本地译文" },
+            refiner: FakeTranslator { _ in
+                await gate.wait()
+                return "LLM 译文"
+            },
+            minChunkDuration: 1,
+            sampleRate: 4
+        )
+
+        await pipeline.start()
+        await pipeline.pumpTask?.value
+
+        XCTAssertEqual(pipeline.captions[0].chinese, "本地译文", "the local translation must appear without waiting for the LLM")
+        XCTAssertTrue(pipeline.captions[0].isProvisional)
+
+        gate.open()
+        for task in pipeline.refineTasks.values { await task.value }
+
+        XCTAssertEqual(pipeline.captions[0].chinese, "LLM 译文", "the LLM result must replace the local draft")
+        XCTAssertFalse(pipeline.captions[0].isProvisional)
+    }
+
+    func testStuckRefinerDoesNotBlockLaterSpeech() async throws {
+        let pipeline = CaptionPipeline(
+            audioSource: FakeAudioSource(chunks: [[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.7, 0.8]]),
+            asr: FakeASR { _ in "hello" },
+            translator: FakeTranslator { _ in "本地译文" },
+            refiner: FakeTranslator { _ in
+                try await Task.sleep(for: .seconds(60))
+                return "never"
+            },
+            minChunkDuration: 1,
+            sampleRate: 4
+        )
+
+        await pipeline.start()
+        await pipeline.pumpTask?.value
+
+        XCTAssertEqual(pipeline.captions.map(\.chinese), ["本地译文", "本地译文"], "a slow LLM must not stop later speech from being captioned")
+        await pipeline.stop()
+        XCTAssertTrue(pipeline.refineTasks.isEmpty)
+    }
+
+    func testRefinerFailureKeepsLocalDraft() async throws {
+        struct StubError: Error {}
+        let pipeline = CaptionPipeline(
+            audioSource: FakeAudioSource(chunks: [[0.1, 0.2, 0.3, 0.4]]),
+            asr: FakeASR { _ in "hello" },
+            translator: FakeTranslator { _ in "本地译文" },
+            refiner: FakeTranslator { _ in throw StubError() },
+            minChunkDuration: 1,
+            sampleRate: 4
+        )
+
+        await pipeline.start()
+        await pipeline.pumpTask?.value
+        for task in pipeline.refineTasks.values { await task.value }
+
+        XCTAssertEqual(pipeline.state, .running, "an LLM failure must not stop captions when a local translation exists")
+        XCTAssertEqual(pipeline.captions[0].chinese, "本地译文")
+        XCTAssertFalse(pipeline.captions[0].isProvisional)
+    }
+
     func testBuffersAudioUntilMinimumChunkDurationReached() async throws {
         var transcribedSamples: [[Float]] = []
         let audioSource = FakeAudioSource(chunks: [[0.1, 0.2], [0.3, 0.4]])
@@ -176,5 +244,23 @@ private struct FakeTranslator: Translator {
 
     func translate(_ text: String) async throws -> String {
         try await handler(text)
+    }
+}
+
+/// 让 refiner 停在 wait()，直到测试调用 open()。
+private final class Gate: @unchecked Sendable {
+    private let stream: AsyncStream<Void>
+    private let continuation: AsyncStream<Void>.Continuation
+
+    init() {
+        (stream, continuation) = AsyncStream.makeStream()
+    }
+
+    func wait() async {
+        for await _ in stream { return }
+    }
+
+    func open() {
+        continuation.yield()
     }
 }

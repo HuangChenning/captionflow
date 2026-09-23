@@ -5,14 +5,37 @@ final class SystemAudioSource: NSObject, AudioSource, SCStreamOutput {
     private var stream: SCStream?
     private var continuation: AsyncStream<[Float]>.Continuation?
     private var converter: AVAudioConverter?
+    /// nil 表示采集全部系统音频；否则只采集该应用发出的声音。
+    private let appBundleID: String?
+
+    init(appBundleID: String? = nil) {
+        self.appBundleID = appBundleID
+    }
 
     func start() async throws -> AsyncStream<[Float]> {
-        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        // 未授权时由系统登记本 app 并弹出授权提示；否则从列表删除后 app 不会重新出现。
+        guard CGPreflightScreenCaptureAccess() || CGRequestScreenCaptureAccess() else {
+            throw AudioSourceError.screenCapturePermissionDenied
+        }
+        let content: SCShareableContent
+        do {
+            content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        } catch let error as SCStreamError where error.code == .userDeclined {
+            throw AudioSourceError.screenCapturePermissionDenied
+        }
         guard let display = content.displays.first else {
             throw AudioSourceError.noDisplayAvailable
         }
 
-        let filter = SCContentFilter(display: display, excludingWindows: [])
+        let filter: SCContentFilter
+        if let appBundleID {
+            guard let app = content.applications.first(where: { $0.bundleIdentifier == appBundleID }) else {
+                throw AudioSourceError.appNotRunning
+            }
+            filter = SCContentFilter(display: display, including: [app], exceptingWindows: [])
+        } else {
+            filter = SCContentFilter(display: display, excludingWindows: [])
+        }
         let configuration = SCStreamConfiguration()
         configuration.capturesAudio = true
         configuration.sampleRate = 48_000

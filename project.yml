@@ -19,6 +19,8 @@ targets:
     platform: macOS
     sources:
       - CaptionFlow
+    configFiles:
+      Debug: Config/Signing.xcconfig
     info:
       path: CaptionFlow/Info.plist
       properties:
@@ -32,6 +34,7 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_NSMicrophoneUsageDescription: "CaptionFlow needs microphone access to generate live captions from your speech."
         CODE_SIGN_ENTITLEMENTS: CaptionFlow/CaptionFlow.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
       - package: ArgmaxOSS
         product: WhisperKit

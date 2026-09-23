@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360" role="img" aria-labelledby="t d">
+<title id="t">How CaptionFlow captions a line</title>
+<desc id="d">Four stages: capture microphone or system audio, recognize English with WhisperKit on-device, translate with an LLM API or Apple Translation as an on-device fallback, and display bilingual live captions. Audio and recognition stay on the Mac; only transcript text is sent to the LLM.</desc>
+<rect width="1200" height="360" rx="24" fill="#F5F7FA"/>
+<g font-family="-apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, &quot;PingFang SC&quot;, &quot;Helvetica Neue&quot;, Arial, sans-serif">
+<text x="80" y="76" font-size="18" font-weight="600" fill="#6B7788" letter-spacing="1.5">01 CAPTURE</text>
+<rect x="72" y="90" width="196" height="170" rx="14" fill="#FFFFFF" stroke="#D5DCE5" stroke-width="2"/>
+<text x="96" y="140" font-size="22" font-weight="600" fill="#1F2933">Microphone</text>
+<text x="96" y="176" font-size="22" font-weight="600" fill="#1F2933">System Audio</text>
+<text x="96" y="230" font-size="18" fill="#6B7788">never saved</text>
+<path d="M276 175 h24" stroke="#8A96A8" stroke-width="2.5"/><path d="M296 169 l8 6 l-8 6" fill="none" stroke="#8A96A8" stroke-width="2.5"/>
+<text x="320" y="76" font-size="18" font-weight="600" fill="#6B7788" letter-spacing="1.5">02 RECOGNIZE</text>
+<rect x="312" y="90" width="210" height="170" rx="14" fill="#FFFFFF" stroke="#D5DCE5" stroke-width="2"/>
+<text x="336" y="144" font-size="26" font-weight="700" fill="#1F2933">WhisperKit</text>
+<text x="336" y="180" font-size="20" fill="#4A5563">base.en model</text>
+<text x="336" y="230" font-size="18" fill="#6B7788">English text</text>
+<path d="M530 175 h24" stroke="#8A96A8" stroke-width="2.5"/><path d="M550 169 l8 6 l-8 6" fill="none" stroke="#8A96A8" stroke-width="2.5"/>
+<text x="574" y="76" font-size="18" font-weight="600" fill="#3D5A80" letter-spacing="1.5">03 TRANSLATE</text>
+<rect x="566" y="90" width="380" height="170" rx="14" fill="#E6ECF4" stroke="#3D5A80" stroke-width="2.5"/>
+<rect x="584" y="108" width="344" height="62" rx="10" fill="#FFFFFF" stroke="#3D5A80" stroke-width="2" stroke-dasharray="6 5"/>
+<text x="602" y="137" font-size="22" font-weight="700" fill="#1F2933">LLM API</text>
+<text x="602" y="160" font-size="18" fill="#4A5563">Anthropic · OpenAI-compatible</text>
+<rect x="584" y="182" width="344" height="62" rx="10" fill="#FFFFFF" stroke="#D5DCE5" stroke-width="2"/>
+<text x="602" y="211" font-size="20" font-weight="700" fill="#1F2933">Apple Translation</text>
+<text x="602" y="234" font-size="18" fill="#4A5563">on-device fallback</text>
+<path d="M954 175 h24" stroke="#8A96A8" stroke-width="2.5"/><path d="M974 169 l8 6 l-8 6" fill="none" stroke="#8A96A8" stroke-width="2.5"/>
+<text x="998" y="76" font-size="18" font-weight="600" fill="#6B7788" letter-spacing="1.5">04 DISPLAY</text>
+<rect x="990" y="90" width="162" height="170" rx="14" fill="#1E2530"/>
+<text x="1010" y="146" font-size="20" fill="#AEB8C6">English</text>
+<text x="1010" y="186" font-size="24" font-weight="600" fill="#F5F7FA">译文字幕</text>
+<text x="1010" y="232" font-size="18" fill="#AEB8C6">floating window</text>
+<text x="72" y="324" font-size="20" fill="#4A5563">Only transcript text leaves the Mac, and only to the LLM endpoint you configure.</text>
+</g>
+</svg>

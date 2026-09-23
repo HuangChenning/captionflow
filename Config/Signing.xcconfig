@@ -1,0 +1,4 @@
+// 本机开发签名：在 Signing.local.xcconfig（不提交）里设置自己的团队和证书，
+// 让 Debug 构建的签名在重新编译后保持不变，系统权限不会因此失效。
+// 没有该文件时保持默认的临时签名。
+#include? "Signing.local.xcconfig"
