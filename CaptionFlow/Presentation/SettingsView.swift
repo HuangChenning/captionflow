@@ -1,3 +1,4 @@
+import Carbon.HIToolbox
 import Sparkle
 import SwiftUI
 
@@ -54,6 +55,12 @@ struct SettingsView: View {
                 ModelSettingsPane()
             case .updates:
                 UpdateSettingsPane(updater: updater)
+            case .textAppearance:
+                TextAppearanceSettingsPane()
+            case .display:
+                DisplaySettingsPane()
+            case .shortcuts:
+                ShortcutSettingsPane()
             case let other:
                 PlaceholderSettingsPane(title: other.title)
             }
@@ -74,6 +81,182 @@ private struct PlaceholderSettingsPane: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle(title)
+    }
+}
+
+private struct TextAppearanceSettingsPane: View {
+    @AppStorage(CaptionOverlaySettings.translationFontSizeKey) private var translationFontSize = CaptionOverlaySettings.defaultTranslationFontSize
+    @AppStorage(CaptionOverlaySettings.originalFontSizeKey) private var originalFontSize = CaptionOverlaySettings.defaultOriginalFontSize
+    @AppStorage(CaptionOverlaySettings.showsOriginalKey) private var showsOriginal = true
+    @AppStorage(CaptionOverlaySettings.textColorKey) private var textColorRaw = CaptionTextColor.white.rawValue
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent("译文字号") {
+                    Slider(value: $translationFontSize, in: 16...48, step: 1)
+                    Text("\(Int(translationFontSize)) pt").monospacedDigit().frame(width: 44, alignment: .trailing)
+                }
+                LabeledContent("原文字号") {
+                    Slider(value: $originalFontSize, in: 12...36, step: 1)
+                    Text("\(Int(originalFontSize)) pt").monospacedDigit().frame(width: 44, alignment: .trailing)
+                }
+                Picker("文字颜色", selection: $textColorRaw) {
+                    ForEach(CaptionTextColor.allCases) { color in
+                        Text(color.displayName).tag(color.rawValue)
+                    }
+                }
+                Toggle("显示英文原文", isOn: $showsOriginal)
+            } header: {
+                Text("悬浮字幕")
+            } footer: {
+                Text("修改会立即应用到悬浮字幕窗。")
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle("文本外观")
+    }
+}
+
+private struct DisplaySettingsPane: View {
+    @AppStorage(CaptionOverlaySettings.backgroundOpacityKey) private var backgroundOpacity = CaptionOverlaySettings.defaultBackgroundOpacity
+    @AppStorage(CaptionOverlaySettings.alwaysOnTopKey) private var alwaysOnTop = true
+    @AppStorage(CaptionOverlaySettings.hidesOnStopKey) private var hidesOnStop = true
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent("背景不透明度") {
+                    Slider(value: $backgroundOpacity, in: 0...1)
+                    Text("\(Int(backgroundOpacity * 100))%").monospacedDigit().frame(width: 44, alignment: .trailing)
+                }
+                Toggle("始终置顶", isOn: $alwaysOnTop)
+                Toggle("停止字幕时隐藏字幕窗", isOn: $hidesOnStop)
+            } header: {
+                Text("悬浮字幕窗")
+            } footer: {
+                Text("拖动字幕窗可调整位置，拖动边缘可调整大小，位置会被记住。")
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle("显示设置")
+    }
+}
+
+private struct ShortcutSettingsPane: View {
+    @AppStorage(GlobalHotKey.enabledKey) private var enabled = true
+    @State private var recording: GlobalHotKey?
+    @State private var message: String?
+    /// 快捷键存在 UserDefaults 的 Data 里，没有 @AppStorage 触发刷新，修改后手动递增。
+    @State private var revision = 0
+    @State private var monitor: Any?
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("启用全局快捷键", isOn: $enabled)
+            } footer: {
+                Text("在任何应用中都可以使用这些快捷键。")
+            }
+            Section {
+                ForEach(GlobalHotKey.allCases) { hotKey in
+                    LabeledContent(hotKey.title) {
+                        HStack(spacing: 6) {
+                            Button(recording == hotKey ? "按下快捷键…" : hotKey.combo().displayString) {
+                                recording == hotKey ? stopRecording() : startRecording(hotKey)
+                            }
+                            .font(.body.monospaced())
+                            .frame(minWidth: 110)
+                            Button {
+                                hotKey.setCombo(nil)
+                                message = nil
+                                revision += 1
+                            } label: {
+                                Image(systemName: "arrow.counterclockwise")
+                            }
+                            .buttonStyle(.borderless)
+                            .help("恢复默认")
+                            .disabled(hotKey.combo() == hotKey.defaultCombo)
+                        }
+                    }
+                }
+                .id(revision)
+            } footer: {
+                if let message {
+                    Text(message).foregroundStyle(.red)
+                } else {
+                    Text("点击快捷键后按下新的组合，需包含 ⌃、⌥ 或 ⌘；按 Esc 取消。")
+                }
+            }
+            .disabled(!enabled)
+        }
+        .onDisappear(perform: stopRecording)
+        .formStyle(.grouped)
+        .navigationTitle("键盘快捷键")
+    }
+
+    private func startRecording(_ hotKey: GlobalHotKey) {
+        stopRecording()
+        recording = hotKey
+        message = nil
+        NotificationCenter.default.post(name: GlobalHotKey.recordingDidChangeNotification, object: nil, userInfo: ["isRecording": true])
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            record(event, for: hotKey)
+            return nil
+        }
+    }
+
+    private func stopRecording() {
+        if let monitor {
+            NSEvent.removeMonitor(monitor)
+            self.monitor = nil
+            NotificationCenter.default.post(name: GlobalHotKey.recordingDidChangeNotification, object: nil, userInfo: ["isRecording": false])
+        }
+        recording = nil
+    }
+
+    private func record(_ event: NSEvent, for hotKey: GlobalHotKey) {
+        guard Int(event.keyCode) != kVK_Escape else {
+            stopRecording()
+            return
+        }
+        let combo = KeyCombo(
+            keyCode: UInt32(event.keyCode),
+            modifiers: KeyCombo.carbonModifiers(from: event.modifierFlags),
+            keyLabel: Self.keyLabel(for: event)
+        )
+        if !combo.hasRequiredModifier {
+            message = "快捷键需包含 ⌃、⌥ 或 ⌘。"
+            return
+        }
+        if let other = hotKey.conflict(with: combo) {
+            message = "\(combo.displayString) 已用于「\(other.title)」。"
+            return
+        }
+        hotKey.setCombo(combo)
+        revision += 1
+        stopRecording()
+    }
+
+    private static func keyLabel(for event: NSEvent) -> String {
+        switch Int(event.keyCode) {
+        case kVK_Space: return "Space"
+        case kVK_Return: return "↩"
+        case kVK_Tab: return "⇥"
+        case kVK_Delete: return "⌫"
+        case kVK_LeftArrow: return "←"
+        case kVK_RightArrow: return "→"
+        case kVK_UpArrow: return "↑"
+        case kVK_DownArrow: return "↓"
+        default:
+            // 功能键的 keyCode 不连续，逐个查表。
+            let functionKeys = [kVK_F1, kVK_F2, kVK_F3, kVK_F4, kVK_F5, kVK_F6, kVK_F7, kVK_F8, kVK_F9, kVK_F10,
+                                kVK_F11, kVK_F12, kVK_F13, kVK_F14, kVK_F15, kVK_F16, kVK_F17, kVK_F18, kVK_F19, kVK_F20]
+            if let index = functionKeys.firstIndex(of: Int(event.keyCode)) {
+                return "F\(index + 1)"
+            }
+            return event.charactersIgnoringModifiers?.uppercased() ?? "?"
+        }
     }
 }
 
