@@ -20,7 +20,8 @@ final class TranslationSessionHolder: ObservableObject {
     }
 
     func updateTarget(_ language: Locale.Language) {
-        guard let source = configuration?.source else { return }
+        // 目标语言不变时保留现有会话：相同配置不会让 translationTask 重新提供会话，清空后翻译会一直等待。
+        guard let source = configuration?.source, configuration?.target != language else { return }
         session = nil
         configuration = TranslationSession.Configuration(source: source, target: language)
     }
