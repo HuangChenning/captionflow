@@ -8,20 +8,25 @@ final class CaptionPipeline: ObservableObject {
     private let audioSource: AudioSource
     private let asr: EnglishASR
     private let translator: Translator
+    /// 设置后，translator 的结果先作为临时译文显示，refiner 的结果到达后替换它。
+    private let refiner: Translator?
     private let minChunkSamples: Int
 
     private(set) var pumpTask: Task<Void, Never>?
+    private(set) var refineTasks: [UUID: Task<Void, Never>] = [:]
 
     init(
         audioSource: AudioSource,
         asr: EnglishASR,
         translator: Translator,
+        refiner: Translator? = nil,
         minChunkDuration: TimeInterval = 3,
         sampleRate: Double = 16_000
     ) {
         self.audioSource = audioSource
         self.asr = asr
         self.translator = translator
+        self.refiner = refiner
         self.minChunkSamples = Int(minChunkDuration * sampleRate)
     }
 
@@ -44,6 +49,7 @@ final class CaptionPipeline: ObservableObject {
         state = .stopping
         pumpTask?.cancel()
         pumpTask = nil
+        cancelRefinements()
         await audioSource.stop()
         state = .idle
     }
@@ -68,21 +74,58 @@ final class CaptionPipeline: ObservableObject {
             let caption = Caption(id: UUID(), english: english, chinese: nil, isProvisional: true, createdAt: .now)
             captions.append(caption)
 
-            let chinese = try await translator.translate(english)
-            updateCaption(id: caption.id, chinese: chinese)
+            guard let refiner else {
+                let chinese = try await translator.translate(english)
+                updateCaption(id: caption.id, chinese: chinese, isProvisional: false)
+                return
+            }
+            if let draft = try? await translator.translate(english) {
+                updateCaption(id: caption.id, chinese: draft, isProvisional: true)
+            }
+            // 在后台等待 refiner，慢或卡住的请求不会挡住后面的语音。
+            refineTasks[caption.id] = Task { [weak self] in
+                let result: Result<String, Error>
+                do {
+                    result = .success(try await refiner.translate(english))
+                } catch {
+                    result = .failure(error)
+                }
+                self?.finishRefinement(id: caption.id, result: result)
+            }
         } catch {
             await fail(error)
         }
     }
 
-    private func updateCaption(id: UUID, chinese: String) {
+    private func finishRefinement(id: UUID, result: Result<String, Error>) {
+        refineTasks[id] = nil
+        guard !Task.isCancelled else { return }
+        switch result {
+        case .success(let chinese):
+            updateCaption(id: id, chinese: chinese, isProvisional: false)
+        case .failure(let error):
+            // 保留临时译文；两种翻译都没有结果时才停止。
+            if let draft = captions.first(where: { $0.id == id })?.chinese {
+                updateCaption(id: id, chinese: draft, isProvisional: false)
+            } else {
+                Task { await fail(error) }
+            }
+        }
+    }
+
+    private func cancelRefinements() {
+        refineTasks.values.forEach { $0.cancel() }
+        refineTasks.removeAll()
+    }
+
+    private func updateCaption(id: UUID, chinese: String, isProvisional: Bool) {
         guard let index = captions.firstIndex(where: { $0.id == id }) else { return }
         let existing = captions[index]
         captions[index] = Caption(
             id: id,
             english: existing.english,
             chinese: chinese,
-            isProvisional: false,
+            isProvisional: isProvisional,
             createdAt: existing.createdAt
         )
     }
@@ -90,6 +133,7 @@ final class CaptionPipeline: ObservableObject {
     private func fail(_ error: Error) async {
         pumpTask?.cancel()
         pumpTask = nil
+        cancelRefinements()
         await audioSource.stop()
         state = .failed(error.localizedDescription)
     }

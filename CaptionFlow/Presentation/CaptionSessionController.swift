@@ -86,10 +86,12 @@ final class CaptionSessionController: ObservableObject {
 
         do {
             let asr = try await WhisperKitEnglishASR.load()
+            let translators = makeTranslators()
             let newPipeline = CaptionPipeline(
                 audioSource: sourceKind.makeSource(appBundleID: systemAudioAppBundleID),
                 asr: asr,
-                translator: makeTranslator()
+                translator: translators.translator,
+                refiner: translators.refiner
             )
             pipeline = newPipeline
             // 采集或识别失败时回到停止状态，原因显示在菜单和字幕窗里。
@@ -169,7 +171,8 @@ final class CaptionSessionController: ObservableObject {
         sourceKind = sourceKind == .microphone ? .systemAudio : .microphone
     }
 
-    private func makeTranslator() -> Translator {
+    /// 自动模式下本地翻译先显示，LLM 结果到达后替换（refiner）。
+    private func makeTranslators() -> (translator: Translator, refiner: Translator?) {
         let defaults = UserDefaults.standard
         let instruction = defaults.string(forKey: "llm.instruction")
             ?? "Translate English speech into concise, natural subtitles."
@@ -181,13 +184,13 @@ final class CaptionSessionController: ObservableObject {
         translationSessionHolder.updateTarget(targetLanguage.locale)
         let fallback = AppleTranslator(holder: translationSessionHolder)
 
-        guard engineMode != .localOnly else { return fallback }
+        guard engineMode != .localOnly else { return (fallback, nil) }
 
         guard let selectedID = LLMProfileStore.selectedID,
               let profile = LLMProfileStore.load().first(where: { $0.id == selectedID }),
               let apiKey = try? keychain.secret(for: selectedID.uuidString), !apiKey.isEmpty,
               let configuration = LLMConfiguration(baseURL: profile.baseURL, model: profile.model, instruction: instruction) else {
-            return fallback
+            return (fallback, nil)
         }
 
         let llmTranslator = LLMTranslator(
@@ -197,6 +200,6 @@ final class CaptionSessionController: ObservableObject {
             targetLanguageName: targetLanguage.displayName
         )
 
-        return engineMode == .llmOnly ? llmTranslator : FallbackTranslator(primary: llmTranslator, fallback: fallback)
+        return engineMode == .llmOnly ? (llmTranslator, nil) : (fallback, llmTranslator)
     }
 }
