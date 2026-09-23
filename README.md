@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md) · [Download](https://github.com/HuangChenning/captionflow/releases/latest) · [Releases](https://github.com/HuangChenning/captionflow/releases)
 
-![Code size](https://img.shields.io/github/languages/code-size/HuangChenning/captionflow) ![Lines of code](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/HuangChenning/captionflow/badges/loc.json)
+![Code size](https://img.shields.io/github/languages/code-size/HuangChenning/captionflow) ![Lines of code](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/HuangChenning/captionflow/badges/loc.json&cacheSeconds=3600)
 
 CaptionFlow is a macOS app that shows live translated captions for English audio: videos, livestreams, podcasts, and online meetings. Speech is recognized on your Mac, and the English text is translated by an LLM you configure, so you read the meaning while people are still talking.
 
