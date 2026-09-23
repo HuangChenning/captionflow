@@ -2,6 +2,8 @@
 
 [English](README.md) · [下载](https://github.com/HuangChenning/captionflow/releases/latest) · [版本发布](https://github.com/HuangChenning/captionflow/releases)
 
+![代码体积](https://img.shields.io/github/languages/code-size/HuangChenning/captionflow) ![代码行数](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/HuangChenning/captionflow/badges/loc.json)
+
 CaptionFlow 是一款 macOS 应用，为英文音频（视频、直播、播客、线上会议）显示实时翻译字幕。语音在你的 Mac 本地识别，识别出的英文文本交给你配置的大模型翻译，对方还在说，你已经能读到意思。
 
 ## 它能做什么
