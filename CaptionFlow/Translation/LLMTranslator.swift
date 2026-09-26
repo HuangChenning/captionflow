@@ -40,8 +40,15 @@ struct LLMTranslator: Translator, CaptionRefiner {
         try await send(text + glossarySection(for: text))
     }
 
-    func refine(english: String, localDraft: String?) async throws -> String {
-        var prompt = "English source:\n\(english)"
+    func refine(english: String, localDraft: String?, previousEnglish: String?) async throws -> String {
+        var prompt = ""
+        if let previousEnglish {
+            prompt += "Previous subtitle, for context only (do not translate it):\n\(previousEnglish)\n\n"
+        }
+        prompt += "English source:\n\(english)"
+        // 原文来自语音识别，常把词听错（"deference" 识别成 "difference"），让模型按语境理解原意。
+        prompt += "\n\nThe English source is speech recognition output and may contain misheard words. "
+            + "If a word does not fit the context, translate what the speaker most likely said."
         if let localDraft {
             prompt += "\n\nLocal draft translation (correct it if needed):\n\(localDraft)"
         }
