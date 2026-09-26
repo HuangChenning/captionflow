@@ -99,6 +99,7 @@ private struct TextAppearanceSettingsPane: View {
     @AppStorage(CaptionOverlaySettings.originalFontSizeKey) private var originalFontSize = CaptionOverlaySettings.defaultOriginalFontSize
     @AppStorage(CaptionOverlaySettings.showsOriginalKey) private var showsOriginal = true
     @AppStorage(CaptionOverlaySettings.textColorKey) private var textColorRaw = CaptionTextColor.white.rawValue
+    @AppStorage(CaptionOverlaySettings.visibleCaptionCountKey) private var visibleCaptionCount = 1
 
     var body: some View {
         Form {
@@ -117,10 +118,12 @@ private struct TextAppearanceSettingsPane: View {
                     }
                 }
                 Toggle("显示英文原文", isOn: $showsOriginal)
+                Stepper("显示最近 \(visibleCaptionCount) 条字幕", value: $visibleCaptionCount,
+                        in: CaptionOverlaySettings.visibleCaptionCountRange)
             } header: {
                 Text("悬浮字幕")
             } footer: {
-                Text("修改会立即应用到悬浮字幕窗。")
+                Text("修改会立即应用到悬浮字幕窗。显示多条时最新一条在最下方，较早的字幕颜色变淡；字幕窗放不下时可拖动边缘调高。")
             }
         }
         .formStyle(.grouped)

@@ -28,4 +28,11 @@ final class CaptionTests: XCTestCase {
         XCTAssertEqual(caption.chinese, "你好")
         XCTAssertNil(caption.refinement)
     }
+
+    /// 字幕窗最多显示最近 5 条；UserDefaults 里的值可能超出范围（例如手动修改），显示时要限制住。
+    func testVisibleCaptionCountIsClampedToOneThroughFive() {
+        XCTAssertEqual(CaptionOverlaySettings.clampedVisibleCaptionCount(0), 1)
+        XCTAssertEqual(CaptionOverlaySettings.clampedVisibleCaptionCount(3), 3)
+        XCTAssertEqual(CaptionOverlaySettings.clampedVisibleCaptionCount(9), 5)
+    }
 }

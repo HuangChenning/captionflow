@@ -10,10 +10,17 @@ enum CaptionOverlaySettings {
     static let backgroundOpacityKey = "overlay.backgroundOpacity"
     static let alwaysOnTopKey = "overlay.alwaysOnTop"
     static let hidesOnStopKey = "overlay.hidesOnStop"
+    static let visibleCaptionCountKey = "overlay.visibleCaptionCount"
 
     static let defaultTranslationFontSize = 28.0
     static let defaultOriginalFontSize = 17.0
     static let defaultBackgroundOpacity = 0.75
+    static let visibleCaptionCountRange = 1...5
+
+    /// 字幕窗同时显示的最近字幕条数，限制在 1–5 条。
+    static func clampedVisibleCaptionCount(_ count: Int) -> Int {
+        min(max(count, visibleCaptionCountRange.lowerBound), visibleCaptionCountRange.upperBound)
+    }
 }
 
 enum CaptionTextColor: String, CaseIterable, Identifiable {
@@ -115,6 +122,7 @@ struct CaptionOverlayView: View {
         .padding(.horizontal, 28)
         .padding(.vertical, 16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(Color(white: 0.1).opacity(backgroundOpacity))
@@ -129,41 +137,54 @@ private struct CaptionOverlayContent: View {
     @AppStorage(CaptionOverlaySettings.originalFontSizeKey) private var originalFontSize = CaptionOverlaySettings.defaultOriginalFontSize
     @AppStorage(CaptionOverlaySettings.showsOriginalKey) private var showsOriginal = true
     @AppStorage(CaptionOverlaySettings.textColorKey) private var textColorRaw = CaptionTextColor.white.rawValue
+    @AppStorage(CaptionOverlaySettings.visibleCaptionCountKey) private var visibleCaptionCount = 1
 
     private var textColor: Color {
         (CaptionTextColor(rawValue: textColorRaw) ?? .white).color
     }
 
     var body: some View {
-        if let caption = pipeline.captions.last {
-            VStack(spacing: 6) {
-                if showsOriginal {
-                    Text(caption.english)
-                        .font(.system(size: originalFontSize))
-                        .foregroundStyle(textColor.opacity(0.75))
-                }
-                // 译文未到时显示“…”；只显示英文时没有译文，不显示这一行。
-                if caption.chinese != nil || caption.isProvisional {
-                    Text(caption.chinese ?? "…")
-                        .font(.system(size: translationFontSize, weight: .semibold))
-                        .foregroundStyle(textColor)
-                    if let status = refinementStatus(caption) {
-                        Text(status)
-                            .font(.system(size: 12))
-                            .foregroundStyle(textColor.opacity(0.5))
-                    }
-                } else if let translationError = pipeline.translationError {
-                    OverlayHint(text: "翻译失败，仅显示英文：\(translationError)")
+        if let latest = pipeline.captions.last {
+            let recent = pipeline.captions.suffix(CaptionOverlaySettings.clampedVisibleCaptionCount(visibleCaptionCount))
+            // 窗口放不下时保留底部最新的字幕，较早的从顶部裁掉。
+            VStack(spacing: 12) {
+                ForEach(recent) { caption in
+                    captionView(caption)
+                        .opacity(caption.id == latest.id ? 1 : 0.6)
                 }
             }
-            .multilineTextAlignment(.center)
-            .lineLimit(2)
-            .minimumScaleFactor(0.6)
+            .frame(maxHeight: .infinity, alignment: .bottom)
         } else if case .failed = pipeline.state {
             OverlayHint(text: "字幕已中断")
         } else {
             OverlayHint(text: notice.map { "等待语音…\n\($0)" } ?? "等待语音…")
         }
+    }
+
+    private func captionView(_ caption: Caption) -> some View {
+        VStack(spacing: 6) {
+            if showsOriginal {
+                Text(caption.english)
+                    .font(.system(size: originalFontSize))
+                    .foregroundStyle(textColor.opacity(0.75))
+            }
+            // 译文未到时显示“…”；只显示英文时没有译文，不显示这一行。
+            if caption.chinese != nil || caption.isProvisional {
+                Text(caption.chinese ?? "…")
+                    .font(.system(size: translationFontSize, weight: .semibold))
+                    .foregroundStyle(textColor)
+                if let status = refinementStatus(caption) {
+                    Text(status)
+                        .font(.system(size: 12))
+                        .foregroundStyle(textColor.opacity(0.5))
+                }
+            } else if caption.id == pipeline.captions.last?.id, let translationError = pipeline.translationError {
+                OverlayHint(text: "翻译失败，仅显示英文：\(translationError)")
+            }
+        }
+        .multilineTextAlignment(.center)
+        .lineLimit(2)
+        .minimumScaleFactor(0.6)
     }
 
     /// 区分本地初译、精修中和精修完成；没有经过精修的字幕不显示状态。
