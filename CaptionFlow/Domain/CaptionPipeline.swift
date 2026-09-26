@@ -19,6 +19,9 @@ final class CaptionPipeline: ObservableObject {
     private let minChunkSamples: Int
     /// 窗口 RMS 低于此值视为静音，不送识别。Whisper 在静音上常输出 "you" 之类的幻觉文本。
     private let silenceRMSThreshold: Float
+    /// 窗口满 minChunkSamples 后，在最后这段里找最安静的一帧切开，避免把单词切成两半。
+    private let cutSearchSamples: Int
+    private let cutFrameSamples: Int
 
     private(set) var pumpTask: Task<Void, Never>?
     private(set) var refineTasks: [UUID: Task<Void, Never>] = [:]
@@ -30,7 +33,8 @@ final class CaptionPipeline: ObservableObject {
         refiner: CaptionRefiner? = nil,
         minChunkDuration: TimeInterval = 3,
         sampleRate: Double = 16_000,
-        silenceRMSThreshold: Float = 0.005
+        silenceRMSThreshold: Float = 0.005,
+        cutSearchDuration: TimeInterval = 1
     ) {
         self.audioSource = audioSource
         self.asr = asr
@@ -38,6 +42,8 @@ final class CaptionPipeline: ObservableObject {
         self.refiner = refiner
         self.minChunkSamples = Int(minChunkDuration * sampleRate)
         self.silenceRMSThreshold = silenceRMSThreshold
+        self.cutSearchSamples = Int(cutSearchDuration * sampleRate)
+        self.cutFrameSamples = Int(0.1 * sampleRate)
     }
 
     /// 会话中途更换翻译方式（例如本地资源下载完成后），只影响之后的语音。
@@ -76,10 +82,32 @@ final class CaptionPipeline: ObservableObject {
             if Task.isCancelled { return }
             buffer.append(contentsOf: chunk)
             guard buffer.count >= minChunkSamples else { continue }
-            let samples = buffer
-            buffer.removeAll()
+            let cut = cutIndex(in: buffer)
+            let samples = Array(buffer[..<cut])
+            buffer.removeFirst(cut)
             await transcribeAndTranslate(samples)
         }
+    }
+
+    /// 固定每 3 秒切一刀会把 "GitHub" 切成 "Git" 和 "Hub"，后半段常识别不出来。
+    /// 改为切在最后 cutSearchSamples 里能量最低的一帧中间，切点之后的音频留给下一个窗口。
+    private func cutIndex(in buffer: [Float]) -> Int {
+        let frame = cutFrameSamples
+        let lower = max(frame, buffer.count - cutSearchSamples)
+        guard frame > 0, lower + frame <= buffer.count else { return buffer.count }
+        var best = buffer.count
+        var bestEnergy = Float.infinity
+        var start = lower
+        while start + frame <= buffer.count {
+            let energy = buffer[start..<(start + frame)].reduce(0) { $0 + $1 * $1 }
+            // 能量相同时取靠后的一帧，连续语音中窗口不会比设定长度短太多。
+            if energy <= bestEnergy {
+                bestEnergy = energy
+                best = start + frame / 2
+            }
+            start += max(1, frame / 2)
+        }
+        return best
     }
 
     private func transcribeAndTranslate(_ samples: [Float]) async {

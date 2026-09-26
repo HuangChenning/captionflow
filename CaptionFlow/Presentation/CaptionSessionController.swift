@@ -98,11 +98,20 @@ final class CaptionSessionController: ObservableObject {
         defer { isPreparing = false }
         overlay.show()
 
+        // 先开始采集再加载模型：加载模型和准备翻译要十几秒，期间播放的语音先在音频流里排队，不会丢。
+        let source = sourceKind.makeSource(appBundleID: systemAudioAppBundleID)
         do {
-            let asr = try await WhisperKitEnglishASR.load()
+            let stream = try await source.start()
+            let asr: WhisperKitEnglishASR
+            do {
+                asr = try await WhisperKitEnglishASR.load()
+            } catch {
+                await source.stop()
+                throw error
+            }
             let translators = await makeTranslators()
             let newPipeline = CaptionPipeline(
-                audioSource: sourceKind.makeSource(appBundleID: systemAudioAppBundleID),
+                audioSource: StartedAudioSource(base: source, stream: stream),
                 asr: asr,
                 translator: translators.translator,
                 refiner: translators.refiner
@@ -276,4 +285,19 @@ final class CaptionSessionController: ObservableObject {
         case .checking, .installed: return "\(pair)的本地翻译暂不可用，\(fallback)"
         }
     }
+}
+
+/// 已经开始采集的音频源。pipeline 调用 start() 时直接拿到已排队的音频流，stop() 仍停止真正的采集。
+private final class StartedAudioSource: AudioSource, @unchecked Sendable {
+    private let base: AudioSource
+    private let stream: AsyncStream<[Float]>
+
+    init(base: AudioSource, stream: AsyncStream<[Float]>) {
+        self.base = base
+        self.stream = stream
+    }
+
+    func start() async throws -> AsyncStream<[Float]> { stream }
+
+    func stop() async { await base.stop() }
 }

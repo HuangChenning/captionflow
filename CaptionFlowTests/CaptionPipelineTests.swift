@@ -328,6 +328,33 @@ final class CaptionPipelineTests: XCTestCase {
         XCTAssertEqual(pipeline.captions.map(\.english), ["hello"])
     }
 
+    // 固定时长硬切会把 "GitHub" 切成 "Git" 和 "Hub"，后半段常被丢掉；应切在停顿处，停顿后的语音完整留给下一个窗口。
+    func testWindowIsCutAtThePauseSoTheNextWordStaysWhole() async throws {
+        let speech: (Int) -> [Float] = { count in (0..<count).map { $0.isMultiple(of: 2) ? 0.1 : -0.1 } }
+        let first = speech(70) + [Float](repeating: 0, count: 10) + speech(30)
+        let audioSource = FakeAudioSource(chunks: [first, speech(70)])
+        var transcribed: [[Float]] = []
+        let asr = FakeASR { samples in
+            transcribed.append(samples)
+            return "hello"
+        }
+        let pipeline = CaptionPipeline(
+            audioSource: audioSource,
+            asr: asr,
+            translator: FakeTranslator { _ in "你好" },
+            minChunkDuration: 1,
+            sampleRate: 100,
+            cutSearchDuration: 0.5
+        )
+
+        await pipeline.start()
+        await pipeline.pumpTask?.value
+
+        XCTAssertEqual(transcribed.first?.count, 75, "cut in the middle of the 70..<80 pause")
+        XCTAssertEqual(transcribed.count, 2)
+        XCTAssertEqual(Array(transcribed[1].prefix(35)), Array(first[75...]), "speech after the pause must start the next window intact")
+    }
+
     func testTranscriptionErrorTransitionsToFailedAndStopsAudioSource() async throws {
         struct StubError: Error {}
         let audioSource = FakeAudioSource(chunks: [[0.1, 0.2, 0.3, 0.4]])

@@ -11,7 +11,7 @@
 ## 语音识别
 
 - [x] 静音时不输出字幕：样本播放结束后，Whisper 每隔几秒把静音识别成 “you” 并译成“你”，既干扰显示，又每条都发出一次 LLM 请求。
-- [ ] 按语句边界切分识别结果：当前约每 3 秒切一段，会把单词和句子截断（如 “mock-” / “up”，“Microsoft Build” 被切成 “Microsoft.” 和 “built in Seattle”，后者译成“西雅图制造”），还出现过整段丢失（“will speak at Microsoft Build in Seattle”）。
+- [ ] 按语句边界切分识别结果：当前约每 3 秒切一段，会把单词和句子截断（如 “mock-” / “up”，“Microsoft Build” 被切成 “Microsoft.” 和 “built in Seattle”，后者译成“西雅图制造”），还出现过整段丢失（“will speak at Microsoft Build in Seattle”）。已改为在每段最后 1 秒内最安静的位置切开（减少单词被切断），但仍不是按句子切分。
 
 ## 本地翻译可用性
 
