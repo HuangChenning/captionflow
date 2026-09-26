@@ -64,10 +64,16 @@ final class CaptionOverlayWindowController {
         panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.minSize = NSSize(width: 320, height: 80)
+        // 窗口大小由用户拖动决定，不随字幕内容变化。NSHostingView 直接作为 contentView 时会调整窗口的尺寸上下限，
+        // 字幕内容高于窗口时约束会反复更新，AppKit 抛出异常导致崩溃；所以放进普通容器，只跟随容器大小。
         let hostingView = NSHostingView(rootView: rootView)
-        // 窗口大小由用户拖动决定，不随字幕内容变化；否则内容高于窗口时约束会反复更新，AppKit 抛出异常导致崩溃。
         hostingView.sizingOptions = []
-        panel.contentView = hostingView
+        hostingView.translatesAutoresizingMaskIntoConstraints = true
+        hostingView.autoresizingMask = [.width, .height]
+        let container = NSView(frame: panel.contentRect(forFrameRect: panel.frame))
+        hostingView.frame = container.bounds
+        container.addSubview(hostingView)
+        panel.contentView = container
 
         if !panel.setFrameUsingName("CaptionOverlay") {
             place(on: NSScreen.main)
@@ -152,8 +158,8 @@ private struct CaptionOverlayContent: View {
             // 窗口放不下时保留底部最新的字幕，较早的从顶部裁掉。
             VStack(spacing: 12) {
                 ForEach(recent) { caption in
-                    // 较早的字幕按当前字幕的 65% 字号显示，并且颜色变淡。
-                    captionView(caption, scale: caption.id == latest.id ? 1 : 0.65)
+                    // 较早的字幕按当前字幕的 50% 字号显示，并且颜色变淡。
+                    captionView(caption, scale: caption.id == latest.id ? 1 : 0.5)
                         .opacity(caption.id == latest.id ? 1 : 0.6)
                 }
             }

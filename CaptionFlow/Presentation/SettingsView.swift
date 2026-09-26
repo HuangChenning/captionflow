@@ -127,7 +127,7 @@ private struct TextAppearanceSettingsPane: View {
             } header: {
                 Text("悬浮字幕")
             } footer: {
-                Text("修改会立即应用到悬浮字幕窗。显示多条时最新一条在最下方，较早的字幕缩小到 65% 并变淡；字幕窗放不下时可拖动边缘调高。")
+                Text("修改会立即应用到悬浮字幕窗。显示多条时最新一条在最下方，较早的字幕缩小到 50% 并变淡；字幕窗放不下时可拖动边缘调高。")
             }
         }
         .formStyle(.grouped)
