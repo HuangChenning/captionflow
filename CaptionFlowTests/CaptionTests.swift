@@ -35,4 +35,9 @@ final class CaptionTests: XCTestCase {
         XCTAssertEqual(CaptionOverlaySettings.clampedVisibleCaptionCount(3), 3)
         XCTAssertEqual(CaptionOverlaySettings.clampedVisibleCaptionCount(9), 5)
     }
+
+    /// 黑字放在默认的深色背景上看不清，只有黑字改用浅色背景，其余颜色保持深色背景。
+    func testOnlyBlackTextUsesLightBackground() {
+        XCTAssertEqual(CaptionTextColor.allCases.filter(\.usesLightBackground), [.black])
+    }
 }

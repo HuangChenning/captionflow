@@ -45,6 +45,13 @@ enum CaptionTextColor: String, CaseIterable, Identifiable {
         case .black: return .black
         }
     }
+
+    /// 黑色文字在深色背景上看不清，所以选黑色时字幕窗改用浅色背景。
+    var usesLightBackground: Bool { self == .black }
+
+    var backgroundColor: Color { usesLightBackground ? Color(white: 0.92) : Color(white: 0.1) }
+
+    var hintColor: Color { usesLightBackground ? .black : .white }
 }
 
 /// 管理置顶、可拖动、无边框的悬浮字幕窗。
@@ -121,6 +128,7 @@ final class CaptionOverlayWindowController {
 struct CaptionOverlayView: View {
     @ObservedObject var session: CaptionSessionController
     @AppStorage(CaptionOverlaySettings.backgroundOpacityKey) private var backgroundOpacity = CaptionOverlaySettings.defaultBackgroundOpacity
+    @AppStorage(CaptionOverlaySettings.textColorKey) private var textColorRaw = CaptionTextColor.white.rawValue
 
     var body: some View {
         Group {
@@ -136,7 +144,7 @@ struct CaptionOverlayView: View {
         .clipped()
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(white: 0.1).opacity(backgroundOpacity))
+                .fill((CaptionTextColor(rawValue: textColorRaw) ?? .white).backgroundColor.opacity(backgroundOpacity))
         )
     }
 }
@@ -214,10 +222,11 @@ private struct CaptionOverlayContent: View {
 
 private struct OverlayHint: View {
     let text: String
+    @AppStorage(CaptionOverlaySettings.textColorKey) private var textColorRaw = CaptionTextColor.white.rawValue
 
     var body: some View {
         Text(text)
             .font(.system(size: 17))
-            .foregroundStyle(.white.opacity(0.6))
+            .foregroundStyle((CaptionTextColor(rawValue: textColorRaw) ?? .white).hintColor.opacity(0.6))
     }
 }
