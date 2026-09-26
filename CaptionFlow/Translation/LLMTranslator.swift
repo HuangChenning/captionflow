@@ -48,10 +48,29 @@ struct LLMTranslator: Translator, CaptionRefiner {
     }
 
     /// 让 LLM 从整场会话中列出需要统一译法的术语。只返回 LLM 的提议，是否采用由用户决定。
-    func proposeTerms(for captions: [Caption]) async throws -> [GlossaryEntry] {
-        let transcript = captions.map { caption in
+    /// 长会话按字符数分段，每段单独请求，避免超出模型上下文；各段结果合并返回，重复项由调用方去掉。
+    func proposeTerms(for captions: [Caption], maxChunkCharacters: Int = 6000) async throws -> [GlossaryEntry] {
+        let lines = captions.map { caption in
             caption.chinese.map { "EN: \(caption.english)\nTranslation: \($0)" } ?? "EN: \(caption.english)"
-        }.joined(separator: "\n")
+        }
+        var chunks: [[String]] = []
+        var length = 0
+        for line in lines {
+            if chunks.isEmpty || (length + line.count > maxChunkCharacters && !chunks[chunks.count - 1].isEmpty) {
+                chunks.append([])
+                length = 0
+            }
+            chunks[chunks.count - 1].append(line)
+            length += line.count
+        }
+        var terms: [GlossaryEntry] = []
+        for chunk in chunks {
+            terms += try await proposeTerms(inTranscript: chunk.joined(separator: "\n"))
+        }
+        return terms
+    }
+
+    private func proposeTerms(inTranscript transcript: String) async throws -> [GlossaryEntry] {
         let prompt = """
         Below is an English speech transcript with its subtitles. List domain terms, product names, \
         and proper nouns whose translation should stay consistent in future subtitles. \

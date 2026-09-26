@@ -1,5 +1,7 @@
 # CaptionFlow MVP Implementation Plan
 
+> **状态：已完成，仅作历史记录。** 这份计划中的功能已经实现，但部分做法与计划不同（例如语音识别使用 WhisperKit 而非 whisper.cpp）。下面未勾选的步骤不代表待办事项；当前功能以 README 为准，待办事项见 `docs/TODO.md`。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Deliver a signed-beta-ready native macOS app that locally transcribes microphone or system English audio and renders LLM-translated Simplified Chinese live subtitles.

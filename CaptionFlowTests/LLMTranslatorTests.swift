@@ -153,6 +153,44 @@ final class LLMTranslatorTests: XCTestCase {
         XCTAssertTrue(body.contains("EN: no translation"))
     }
 
+    /// 长会话要分段发送，每段不超过上限，且每句都被发送一次，不会被截掉。
+    func testProposeTermsSplitsLongTranscriptIntoChunks() async throws {
+        let bodies = BodiesBox()
+        let responseJSON = Data(#"{"content":[{"type":"text","text":"[]"}]}"#.utf8)
+        let translator = LLMTranslator(configuration: configuration, apiKey: "test-key") { request in
+            bodies.values.append(String(decoding: request.httpBody!, as: UTF8.self))
+            return (responseJSON, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+        let captions = (1...5).map { caption("sentence number \($0)", "第 \($0) 句") }
+
+        // 每行约 40 字符，上限 100 时每段放两行。
+        _ = try await translator.proposeTerms(for: captions, maxChunkCharacters: 100)
+
+        XCTAssertEqual(bodies.values.count, 3)
+        for number in 1...5 {
+            XCTAssertEqual(bodies.values.filter { $0.contains("sentence number \(number)\\n") }.count, 1)
+        }
+    }
+
+    /// 各段的术语都要返回，不能只保留最后一段。
+    func testProposeTermsMergesTermsFromAllChunks() async throws {
+        let replies = ["[{\"source\": \"Kubernetes\", \"target\": \"Kubernetes\"}]", "[{\"source\": \"sprint\", \"target\": \"迭代\"}]"]
+        let bodies = BodiesBox()
+        let translator = LLMTranslator(configuration: configuration, apiKey: "test-key") { request in
+            let text = replies[bodies.values.count]
+            bodies.values.append("")
+            let data = try JSONSerialization.data(withJSONObject: ["content": [["type": "text", "text": text]]])
+            return (data, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+
+        let terms = try await translator.proposeTerms(
+            for: [caption("We use Kubernetes", "我们用 Kubernetes"), caption("Plan the sprint", "规划迭代")],
+            maxChunkCharacters: 40
+        )
+
+        XCTAssertEqual(terms.map(\.source), ["Kubernetes", "sprint"])
+    }
+
     private func translator(replying text: String) -> LLMTranslator {
         let responseJSON = try! JSONSerialization.data(withJSONObject: ["content": [["type": "text", "text": text]]])
         return LLMTranslator(configuration: configuration, apiKey: "test-key") { request in
@@ -167,4 +205,8 @@ final class LLMTranslatorTests: XCTestCase {
 
 private final class BodyBox: @unchecked Sendable {
     var value: String?
+}
+
+private final class BodiesBox: @unchecked Sendable {
+    var values: [String] = []
 }
