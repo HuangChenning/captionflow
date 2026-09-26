@@ -35,6 +35,22 @@ struct TermCandidate: Codable, Equatable, Identifiable {
             return TermCandidate(source: source, target: target, example: example, sessionDate: session.createdAt)
         }
     }
+
+    /// 把一次提取的结果加入待确认列表并返回新增的候选。
+    /// 已在词库、已在候选列表或用户忽略过的术语不再提出。
+    static func record(
+        _ proposals: [GlossaryEntry],
+        from session: CaptionSession,
+        candidateStore: TermCandidateStore = TermCandidateStore(),
+        glossaryStore: GlossaryStore = GlossaryStore(),
+        ignoredStore: IgnoredTermStore = IgnoredTermStore()
+    ) throws -> [TermCandidate] {
+        let pending = try candidateStore.load()
+        let existing = try glossaryStore.load().map(\.source) + pending.map(\.source) + ignoredStore.load()
+        let found = make(from: proposals, session: session, excluding: existing)
+        try candidateStore.save(pending + found)
+        return found
+    }
 }
 
 /// 待确认候选单独存放，与已确认词库分开，保证候选不会被当作已确认术语用于翻译。
@@ -58,5 +74,31 @@ struct TermCandidateStore {
     private static var defaultFileURL: URL {
         let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return root.appendingPathComponent("CaptionFlow/term-candidates.json")
+    }
+}
+
+/// 用户点过“忽略”的英文术语，之后提取候选时不再提出。
+struct IgnoredTermStore {
+    let fileURL: URL
+
+    init(fileURL: URL = IgnoredTermStore.defaultFileURL) {
+        self.fileURL = fileURL
+    }
+
+    func load() throws -> [String] {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return [] }
+        return try JSONDecoder().decode([String].self, from: Data(contentsOf: fileURL))
+    }
+
+    func add(_ source: String) throws {
+        let ignored = try load()
+        guard !ignored.contains(where: { $0.caseInsensitiveCompare(source) == .orderedSame }) else { return }
+        try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(ignored + [source]).write(to: fileURL, options: .atomic)
+    }
+
+    private static var defaultFileURL: URL {
+        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return root.appendingPathComponent("CaptionFlow/ignored-terms.json")
     }
 }

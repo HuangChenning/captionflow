@@ -74,15 +74,7 @@ struct HistoryView: View {
         do {
             let proposals = try await translator.proposeTerms(for: session.captions)
             // 等待 LLM 期间用户可能改过词库或候选，回复到达后再读取。
-            let candidateStore = TermCandidateStore()
-            let pending = try candidateStore.load()
-            let glossary = try GlossaryStore().load()
-            let found = TermCandidate.make(
-                from: proposals,
-                session: session,
-                excluding: glossary.map(\.source) + pending.map(\.source)
-            )
-            try candidateStore.save(pending + found)
+            let found = try TermCandidate.record(proposals, from: session)
             resultMessage = found.isEmpty
                 ? "没有找到新的术语候选。"
                 : "找到 \(found.count) 个术语候选，请到“自定义词汇”中逐条确认。"

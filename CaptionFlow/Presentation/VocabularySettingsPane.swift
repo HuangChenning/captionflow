@@ -8,6 +8,7 @@ struct VocabularySettingsPane: View {
     @State private var errorMessage: String?
     private let store = GlossaryStore()
     private let candidateStore = TermCandidateStore()
+    private let ignoredStore = IgnoredTermStore()
 
     private var trimmedSource: String { candidateSource.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var trimmedTarget: String { candidateTarget.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -47,7 +48,7 @@ struct VocabularySettingsPane: View {
                             Button("采纳") { accept(candidate) }
                                 .disabled(isInGlossary(candidate.source)
                                     || candidate.target.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                            Button("忽略") { candidates.removeAll { $0.id == candidate.id } }
+                            Button("忽略") { ignore(candidate) }
                         }
                         .buttonStyle(.borderless)
                         Group {
@@ -64,7 +65,7 @@ struct VocabularySettingsPane: View {
             } header: {
                 Text("待确认候选")
             } footer: {
-                Text("候选由 LLM 从字幕历史中提出，只有点“采纳”后才会加入已确认词库。")
+                Text("候选由 LLM 从字幕历史中提出，只有点“采纳”后才会加入已确认词库。忽略过的术语之后不会再作为候选出现，仍可在上方手动添加。")
             }
             Section("已确认词库") {
                 if entries.isEmpty {
@@ -108,6 +109,13 @@ struct VocabularySettingsPane: View {
             target: candidate.target.trimmingCharacters(in: .whitespacesAndNewlines)
         ))
         candidates.removeAll { $0.id == candidate.id }
+    }
+
+    private func ignore(_ candidate: TermCandidate) {
+        do {
+            try ignoredStore.add(candidate.source)
+            candidates.removeAll { $0.id == candidate.id }
+        } catch { errorMessage = error.localizedDescription }
     }
 
     private func saveCandidates() {

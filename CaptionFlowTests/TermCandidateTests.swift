@@ -69,4 +69,40 @@ final class TermCandidateTests: XCTestCase {
         XCTAssertEqual(try candidateStore.load(), [candidate])
         XCTAssertEqual(try glossaryStore.load(), [])
     }
+
+    /// 用户忽略过的术语即使 LLM 再次提出，也不能重新出现在待确认列表里；其他新术语照常加入。
+    func testRecordSkipsIgnoredTermsAndKeepsPendingCandidates() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let candidateStore = TermCandidateStore(fileURL: directory.appendingPathComponent("term-candidates.json"))
+        let glossaryStore = GlossaryStore(fileURL: directory.appendingPathComponent("glossary.json"))
+        let ignoredStore = IgnoredTermStore(fileURL: directory.appendingPathComponent("ignored-terms.json"))
+        let pending = TermCandidate(source: "roadmap", target: "路线图", example: "the roadmap", sessionDate: sessionDate)
+        try candidateStore.save([pending])
+        try ignoredStore.add("Sprint")
+
+        let found = try TermCandidate.record(
+            [GlossaryEntry(source: "sprint", target: "迭代"), GlossaryEntry(source: "backlog", target: "待办列表")],
+            from: session(["Plan the sprint and groom the backlog"]),
+            candidateStore: candidateStore,
+            glossaryStore: glossaryStore,
+            ignoredStore: ignoredStore
+        )
+
+        XCTAssertEqual(found.map(\.source), ["backlog"])
+        XCTAssertEqual(try candidateStore.load().map(\.source), ["roadmap", "backlog"])
+    }
+
+    /// 忽略记录要在重启后保留，同一术语不因大小写不同重复记录。
+    func testIgnoredTermStorePersistsWithoutDuplicates() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appendingPathComponent("ignored-terms.json")
+
+        XCTAssertEqual(try IgnoredTermStore(fileURL: fileURL).load(), [])
+        try IgnoredTermStore(fileURL: fileURL).add("Sprint")
+        try IgnoredTermStore(fileURL: fileURL).add("sprint")
+
+        XCTAssertEqual(try IgnoredTermStore(fileURL: fileURL).load(), ["Sprint"])
+    }
 }
