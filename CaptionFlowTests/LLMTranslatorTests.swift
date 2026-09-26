@@ -65,6 +65,15 @@ final class LLMTranslatorTests: XCTestCase {
         XCTAssertTrue(body.contains("do not translate it"))
     }
 
+    /// 识别结果常有听错的词，模型若逐字翻译，"difference" 会译成“不同”而不是“尊重”。
+    func testRefinementWarnsThatSourceMayBeMisheard() async throws {
+        let body = try await capturedRequestBody(glossary: []) {
+            try await $0.refine(english: "give me difference", localDraft: nil, previousEnglish: nil)
+        }
+
+        XCTAssertTrue(body.contains("misheard"))
+    }
+
     func testRefinementWithoutPreviousCaptionHasNoContextSection() async throws {
         let body = try await capturedRequestBody(glossary: []) {
             try await $0.refine(english: "hello", localDraft: nil, previousEnglish: nil)
