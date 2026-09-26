@@ -25,24 +25,48 @@ final class LLMTranslatorTests: XCTestCase {
         XCTAssertEqual(result, "你好，你好吗？")
     }
 
+    /// 用户确认的术语必须进入精修请求，否则词库对字幕没有任何作用。
     func testRefinementRequestIncludesSourceDraftAndApprovedGlossary() async throws {
-        let responseJSON = Data(#"{"content":[{"type":"text","text":"会议纪要"}]}"#.utf8)
-        let translator = LLMTranslator(configuration: configuration, apiKey: "test-key") { request in
-            let body = String(decoding: request.httpBody!, as: UTF8.self)
-            XCTAssertTrue(body.contains("meeting notes"))
-            XCTAssertTrue(body.contains("会议记录"))
-            XCTAssertTrue(body.contains("minutes=会议纪要"))
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            return (responseJSON, response)
+        let body = try await capturedRequestBody(glossary: [GlossaryEntry(source: "minutes", target: "会议纪要")]) {
+            try await $0.refine(english: "Please send the Minutes", localDraft: "请发送分钟")
         }
 
-        let result = try await translator.refine(
-            english: "meeting notes",
-            localDraft: "会议记录",
-            glossary: [GlossaryEntry(source: "minutes", target: "会议纪要")]
-        )
+        XCTAssertTrue(body.contains("Please send the Minutes"))
+        XCTAssertTrue(body.contains("请发送分钟"), "the LLM must see the local draft so it can correct it")
+        XCTAssertTrue(body.contains("minutes=会议纪要"), "matching is case-insensitive")
+    }
 
-        XCTAssertEqual(result, "会议纪要")
+    /// 只附带原文里出现的术语：其余词条对这一句没有用，还会增加请求长度。
+    func testRefinementOmitsGlossaryTermsNotInSource() async throws {
+        let body = try await capturedRequestBody(glossary: [GlossaryEntry(source: "minutes", target: "会议纪要")]) {
+            try await $0.refine(english: "hello", localDraft: nil)
+        }
+
+        XCTAssertFalse(body.contains("会议纪要"))
+        XCTAssertFalse(body.contains("glossary"))
+    }
+
+    /// 仅 LLM 模式下没有精修步骤，术语要在直接翻译时生效。
+    func testTranslateAlsoAppliesGlossary() async throws {
+        let body = try await capturedRequestBody(glossary: [GlossaryEntry(source: "minutes", target: "会议纪要")]) {
+            try await $0.translate("the minutes")
+        }
+
+        XCTAssertTrue(body.contains("minutes=会议纪要"))
+    }
+
+    private func capturedRequestBody(
+        glossary: [GlossaryEntry],
+        _ call: (LLMTranslator) async throws -> String
+    ) async throws -> String {
+        let captured = BodyBox()
+        let responseJSON = Data(#"{"content":[{"type":"text","text":"ok"}]}"#.utf8)
+        let translator = LLMTranslator(configuration: configuration, apiKey: "test-key", glossary: glossary) { request in
+            captured.value = String(decoding: request.httpBody!, as: UTF8.self)
+            return (responseJSON, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+        _ = try await call(translator)
+        return try XCTUnwrap(captured.value)
     }
 
     func testTranslateParsesOpenAIChatCompletionsResponse() async throws {
@@ -94,4 +118,8 @@ final class LLMTranslatorTests: XCTestCase {
             // expected
         }
     }
+}
+
+private final class BodyBox: @unchecked Sendable {
+    var value: String?
 }

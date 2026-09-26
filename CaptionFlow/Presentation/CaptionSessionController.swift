@@ -178,7 +178,7 @@ final class CaptionSessionController: ObservableObject {
     }
 
     /// 自动模式下本地翻译先显示，LLM 结果到达后替换（refiner）。
-    private func makeTranslators() -> (translator: Translator, refiner: Translator?) {
+    private func makeTranslators() -> (translator: Translator, refiner: CaptionRefiner?) {
         let defaults = UserDefaults.standard
         let instruction = defaults.string(forKey: "llm.instruction")
             ?? "Translate English speech into concise, natural subtitles."
@@ -203,7 +203,8 @@ final class CaptionSessionController: ObservableObject {
             configuration: configuration,
             apiKey: apiKey,
             style: profile.apiStyle,
-            targetLanguageName: targetLanguage.displayName
+            targetLanguageName: targetLanguage.displayName,
+            glossary: (try? GlossaryStore().load()) ?? []
         )
 
         return engineMode == .llmOnly ? (llmTranslator, nil) : (fallback, llmTranslator)

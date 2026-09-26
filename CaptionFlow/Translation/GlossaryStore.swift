@@ -12,7 +12,14 @@ struct GlossaryStore {
         return try JSONDecoder().decode([GlossaryEntry].self, from: Data(contentsOf: fileURL))
     }
 
+    /// 去掉首尾空白，丢弃英文或中文为空的词条，避免把编辑到一半的空行写进词库。
     func save(_ entries: [GlossaryEntry]) throws {
+        let entries = entries.compactMap { entry -> GlossaryEntry? in
+            let source = entry.source.trimmingCharacters(in: .whitespacesAndNewlines)
+            let target = entry.target.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !source.isEmpty, !target.isEmpty else { return nil }
+            return GlossaryEntry(id: entry.id, source: source, target: target)
+        }
         try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try JSONEncoder().encode(entries).write(to: fileURL, options: .atomic)
     }
