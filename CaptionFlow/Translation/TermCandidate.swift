@@ -93,8 +93,17 @@ struct IgnoredTermStore {
     func add(_ source: String) throws {
         let ignored = try load()
         guard !ignored.contains(where: { $0.caseInsensitiveCompare(source) == .orderedSame }) else { return }
+        try save(ignored + [source])
+    }
+
+    /// 恢复后该术语在之后的提取中可以再次作为候选出现。
+    func remove(_ source: String) throws {
+        try save(load().filter { $0 != source })
+    }
+
+    private func save(_ ignored: [String]) throws {
         try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try JSONEncoder().encode(ignored + [source]).write(to: fileURL, options: .atomic)
+        try JSONEncoder().encode(ignored).write(to: fileURL, options: .atomic)
     }
 
     private static var defaultFileURL: URL {

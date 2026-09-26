@@ -105,4 +105,25 @@ final class TermCandidateTests: XCTestCase {
 
         XCTAssertEqual(try IgnoredTermStore(fileURL: fileURL).load(), ["Sprint"])
     }
+
+    /// 恢复后该术语要能被再次提出，否则误点“忽略”就无法挽回。
+    func testRestoredTermCanBeProposedAgain() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let ignoredStore = IgnoredTermStore(fileURL: directory.appendingPathComponent("ignored-terms.json"))
+        try ignoredStore.add("sprint")
+        try ignoredStore.add("backlog")
+
+        try ignoredStore.remove("sprint")
+
+        XCTAssertEqual(try ignoredStore.load(), ["backlog"])
+        let found = try TermCandidate.record(
+            [GlossaryEntry(source: "sprint", target: "迭代")],
+            from: session(["Plan the sprint"]),
+            candidateStore: TermCandidateStore(fileURL: directory.appendingPathComponent("term-candidates.json")),
+            glossaryStore: GlossaryStore(fileURL: directory.appendingPathComponent("glossary.json")),
+            ignoredStore: ignoredStore
+        )
+        XCTAssertEqual(found.map(\.source), ["sprint"])
+    }
 }

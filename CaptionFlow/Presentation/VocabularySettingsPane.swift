@@ -3,6 +3,7 @@ import SwiftUI
 struct VocabularySettingsPane: View {
     @State private var entries: [GlossaryEntry] = []
     @State private var candidates: [TermCandidate] = []
+    @State private var ignoredTerms: [String] = []
     @State private var candidateSource = ""
     @State private var candidateTarget = ""
     @State private var errorMessage: String?
@@ -65,7 +66,23 @@ struct VocabularySettingsPane: View {
             } header: {
                 Text("待确认候选")
             } footer: {
-                Text("候选由 LLM 从字幕历史中提出，只有点“采纳”后才会加入已确认词库。忽略过的术语之后不会再作为候选出现，仍可在上方手动添加。")
+                Text("候选由 LLM 从字幕历史中提出，只有点“采纳”后才会加入已确认词库。忽略过的术语之后不会再作为候选出现，可在下方“已忽略”中恢复。")
+            }
+            if !ignoredTerms.isEmpty {
+                Section {
+                    ForEach(ignoredTerms, id: \.self) { term in
+                        HStack {
+                            Text(term)
+                            Spacer()
+                            Button("恢复") { restore(term) }
+                                .buttonStyle(.borderless)
+                        }
+                    }
+                } header: {
+                    Text("已忽略")
+                } footer: {
+                    Text("恢复后，下次提取术语候选时这个词可以再次出现。")
+                }
             }
             Section("已确认词库") {
                 if entries.isEmpty {
@@ -100,6 +117,7 @@ struct VocabularySettingsPane: View {
         do {
             entries = try store.load()
             candidates = try candidateStore.load()
+            ignoredTerms = try ignoredStore.load()
         } catch { errorMessage = error.localizedDescription }
     }
 
@@ -114,7 +132,15 @@ struct VocabularySettingsPane: View {
     private func ignore(_ candidate: TermCandidate) {
         do {
             try ignoredStore.add(candidate.source)
+            ignoredTerms = try ignoredStore.load()
             candidates.removeAll { $0.id == candidate.id }
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    private func restore(_ term: String) {
+        do {
+            try ignoredStore.remove(term)
+            ignoredTerms = try ignoredStore.load()
         } catch { errorMessage = error.localizedDescription }
     }
 
