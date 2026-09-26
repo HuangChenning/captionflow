@@ -52,7 +52,7 @@ final class CaptionOverlayWindowController {
 
     init<Content: View>(rootView: Content) {
         panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 900, height: 140),
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 140),
             styleMask: [.borderless, .nonactivatingPanel, .resizable],
             backing: .buffered,
             defer: true
@@ -160,9 +160,9 @@ private struct CaptionOverlayContent: View {
             // 窗口放不下时保留底部最新的字幕，较早的从顶部裁掉。
             VStack(spacing: 12) {
                 ForEach(recent) { caption in
-                    // 较早的字幕固定用 12 pt，并且颜色变淡。
+                    // 较早的字幕固定用 12 pt，颜色更淡，不显示精修状态。
                     captionView(caption, isLatest: caption.id == latest.id)
-                        .opacity(caption.id == latest.id ? 1 : 0.6)
+                        .opacity(caption.id == latest.id ? 1 : 0.4)
                 }
             }
             .frame(maxHeight: .infinity, alignment: .bottom)
@@ -185,7 +185,7 @@ private struct CaptionOverlayContent: View {
                 Text(caption.chinese ?? "…")
                     .font(.system(size: isLatest ? translationFontSize : Self.earlierCaptionFontSize, weight: .semibold))
                     .foregroundStyle(textColor)
-                if let status = refinementStatus(caption) {
+                if isLatest, let status = refinementStatus(caption) {
                     Text(status)
                         .font(.system(size: 12))
                         .foregroundStyle(textColor.opacity(0.5))
