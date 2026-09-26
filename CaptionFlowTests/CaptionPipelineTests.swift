@@ -58,6 +58,28 @@ final class CaptionPipelineTests: XCTestCase {
         XCTAssertFalse(pipeline.captions[0].isProvisional)
     }
 
+    /// 精修要拿到本地初译，才能纠正它而不是从头重新翻译。
+    func testRefinerReceivesLocalDraft() async throws {
+        let pipeline = CaptionPipeline(
+            audioSource: FakeAudioSource(chunks: [[0.1, 0.2, 0.3, 0.4]]),
+            asr: FakeASR { _ in "the minutes" },
+            translator: FakeTranslator { _ in "分钟" },
+            refiner: FakeRefiner { english, draft in
+                XCTAssertEqual(english, "the minutes")
+                XCTAssertEqual(draft, "分钟")
+                return "会议纪要"
+            },
+            minChunkDuration: 1,
+            sampleRate: 4
+        )
+
+        await pipeline.start()
+        await pipeline.pumpTask?.value
+        for task in pipeline.refineTasks.values { await task.value }
+
+        XCTAssertEqual(pipeline.captions[0].chinese, "会议纪要")
+    }
+
     func testStuckRefinerDoesNotBlockLaterSpeech() async throws {
         let pipeline = CaptionPipeline(
             audioSource: FakeAudioSource(chunks: [[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.7, 0.8]]),
@@ -244,6 +266,20 @@ private struct FakeTranslator: Translator {
 
     func translate(_ text: String) async throws -> String {
         try await handler(text)
+    }
+}
+
+extension FakeTranslator: CaptionRefiner {
+    func refine(english: String, localDraft: String?) async throws -> String {
+        try await handler(english)
+    }
+}
+
+private struct FakeRefiner: CaptionRefiner {
+    let handler: @Sendable (String, String?) async throws -> String
+
+    func refine(english: String, localDraft: String?) async throws -> String {
+        try await handler(english, localDraft)
     }
 }
 

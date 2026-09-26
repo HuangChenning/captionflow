@@ -6,13 +6,14 @@ enum LLMTranslatorError: Error, Equatable {
     case emptyResponse
 }
 
-struct LLMTranslator: Translator {
+struct LLMTranslator: Translator, CaptionRefiner {
     typealias RequestPerformer = @Sendable (URLRequest) async throws -> (Data, URLResponse)
 
     private let configuration: LLMConfiguration
     private let apiKey: String
     private let style: LLMAPIStyle
     private let targetLanguageName: String
+    private let glossary: [GlossaryEntry]
     private let performRequest: RequestPerformer
 
     init(
@@ -20,16 +21,41 @@ struct LLMTranslator: Translator {
         apiKey: String,
         style: LLMAPIStyle = .anthropic,
         targetLanguageName: String = TargetLanguage.simplifiedChinese.displayName,
+        glossary: [GlossaryEntry] = [],
         performRequest: @escaping RequestPerformer = { try await URLSession.shared.data(for: $0) }
     ) {
         self.configuration = configuration
         self.apiKey = apiKey
         self.style = style
         self.targetLanguageName = targetLanguageName
+        self.glossary = glossary
         self.performRequest = performRequest
     }
 
     func translate(_ text: String) async throws -> String {
+        try await send(text + glossarySection(for: text))
+    }
+
+    func refine(english: String, localDraft: String?) async throws -> String {
+        var prompt = "English source:\n\(english)"
+        if let localDraft {
+            prompt += "\n\nLocal draft translation (correct it if needed):\n\(localDraft)"
+        }
+        prompt += glossarySection(for: english)
+        prompt += "\n\nReply with only the final subtitle text."
+        return try await send(prompt)
+    }
+
+    /// 只附带原文里出现过的已确认术语，词库变大时不会撑大每个请求。
+    private func glossarySection(for english: String) -> String {
+        let terms = glossary
+            .filter { english.range(of: $0.source, options: .caseInsensitive) != nil }
+            .map { "\($0.source)=\($0.target)" }
+        guard !terms.isEmpty else { return "" }
+        return "\n\nApproved glossary (always use these translations):\n" + terms.joined(separator: "\n")
+    }
+
+    private func send(_ text: String) async throws -> String {
         guard !apiKey.isEmpty else { throw LLMTranslatorError.emptyAPIKey }
 
         let request: URLRequest
@@ -52,20 +78,6 @@ struct LLMTranslator: Translator {
         case .openAICompatible:
             return try parseOpenAIResponse(data)
         }
-    }
-
-    func refine(english: String, localDraft: String, glossary: [GlossaryEntry]) async throws -> String {
-        let terms = glossary.map { "\($0.source)=\($0.target)" }.joined(separator: "\n")
-        return try await translate("""
-        English source:
-        \(english)
-
-        Local Chinese draft:
-        \(localDraft)
-
-        Approved glossary:
-        \(terms)
-        """)
     }
 
     private var systemInstruction: String {

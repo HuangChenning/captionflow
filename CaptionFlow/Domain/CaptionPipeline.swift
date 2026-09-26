@@ -9,7 +9,7 @@ final class CaptionPipeline: ObservableObject {
     private let asr: EnglishASR
     private let translator: Translator
     /// 设置后，translator 的结果先作为临时译文显示，refiner 的结果到达后替换它。
-    private let refiner: Translator?
+    private let refiner: CaptionRefiner?
     private let minChunkSamples: Int
 
     private(set) var pumpTask: Task<Void, Never>?
@@ -19,7 +19,7 @@ final class CaptionPipeline: ObservableObject {
         audioSource: AudioSource,
         asr: EnglishASR,
         translator: Translator,
-        refiner: Translator? = nil,
+        refiner: CaptionRefiner? = nil,
         minChunkDuration: TimeInterval = 3,
         sampleRate: Double = 16_000
     ) {
@@ -79,14 +79,15 @@ final class CaptionPipeline: ObservableObject {
                 updateCaption(id: caption.id, chinese: chinese, isProvisional: false)
                 return
             }
-            if let draft = try? await translator.translate(english) {
+            let draft = try? await translator.translate(english)
+            if let draft {
                 updateCaption(id: caption.id, chinese: draft, isProvisional: true)
             }
             // 在后台等待 refiner，慢或卡住的请求不会挡住后面的语音。
             refineTasks[caption.id] = Task { [weak self] in
                 let result: Result<String, Error>
                 do {
-                    result = .success(try await refiner.translate(english))
+                    result = .success(try await refiner.refine(english: english, localDraft: draft))
                 } catch {
                     result = .failure(error)
                 }

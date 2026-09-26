@@ -38,4 +38,16 @@ final class KeychainStoreTests: XCTestCase {
 
         XCTAssertEqual(try store.load(), [entry])
     }
+
+    /// 设置页编辑时会自动保存，清空到一半的词条不能进入翻译用的词库。
+    func testGlossaryStoreDropsBlankEntriesAndTrimsWhitespace() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = GlossaryStore(fileURL: directory.appendingPathComponent("glossary.json"))
+        let kept = GlossaryEntry(source: " minutes ", target: "会议纪要\n")
+
+        try store.save([kept, GlossaryEntry(source: "", target: "空"), GlossaryEntry(source: "agenda", target: "  ")])
+
+        XCTAssertEqual(try store.load(), [GlossaryEntry(id: kept.id, source: "minutes", target: "会议纪要")])
+    }
 }

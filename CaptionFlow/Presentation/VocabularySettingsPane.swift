@@ -7,32 +7,51 @@ struct VocabularySettingsPane: View {
     @State private var errorMessage: String?
     private let store = GlossaryStore()
 
+    private var trimmedSource: String { candidateSource.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var trimmedTarget: String { candidateTarget.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var isDuplicate: Bool {
+        entries.contains { $0.source.trimmingCharacters(in: .whitespacesAndNewlines).caseInsensitiveCompare(trimmedSource) == .orderedSame }
+    }
+
     var body: some View {
         Form {
             Section {
                 TextField("英文术语", text: $candidateSource)
                 TextField("简体中文", text: $candidateTarget)
                 Button("添加到已确认词库") { confirmCandidate() }
-                    .disabled(candidateSource.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || candidateTarget.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(trimmedSource.isEmpty || trimmedTarget.isEmpty || isDuplicate)
+                if isDuplicate {
+                    Text("“\(trimmedSource)”已在词库中，可在下方直接修改。")
+                        .foregroundStyle(.secondary)
+                }
             } header: {
                 Text("添加新词汇")
             } footer: {
-                Text("输入英文和对应简体中文后即可添加。LLM 候选也必须经你确认才会进入后续翻译使用的词库。")
+                Text("已确认的词汇会在 LLM 翻译时使用，仅本地翻译模式下不生效。修改在下次开始字幕时生效。")
             }
             Section("已确认词库") {
+                if entries.isEmpty {
+                    Text("还没有词汇").foregroundStyle(.secondary)
+                }
                 ForEach($entries) { $entry in
                     HStack {
                         TextField("英文", text: $entry.source)
                         TextField("中文", text: $entry.target)
+                        Button {
+                            entries.removeAll { $0.id == entry.id }
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.borderless)
+                        .help("删除")
                     }
                 }
-                .onDelete { offsets in entries.remove(atOffsets: offsets); save() }
-                Button("保存修改", action: save)
             }
         }
         .formStyle(.grouped)
         .navigationTitle("自定义词汇")
         .onAppear(perform: load)
+        .onChange(of: entries) { save() }
         .alert("无法保存词库", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("好", role: .cancel) {}
         } message: { Text(errorMessage ?? "") }
@@ -44,10 +63,9 @@ struct VocabularySettingsPane: View {
     }
 
     private func confirmCandidate() {
-        entries.append(GlossaryEntry(source: candidateSource.trimmingCharacters(in: .whitespacesAndNewlines), target: candidateTarget.trimmingCharacters(in: .whitespacesAndNewlines)))
+        entries.append(GlossaryEntry(source: trimmedSource, target: trimmedTarget))
         candidateSource = ""
         candidateTarget = ""
-        save()
     }
 
     private func save() {
