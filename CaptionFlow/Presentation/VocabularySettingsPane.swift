@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct VocabularySettingsPane: View {
@@ -9,6 +10,8 @@ struct VocabularySettingsPane: View {
     @State private var errorMessage: String?
     @State private var isAnalyzing = false
     @State private var analysisMessage: String?
+    @State private var optimizingCandidateID: UUID?
+    @State private var didTryAdd = false
     private let store = GlossaryStore()
     private let candidateStore = TermCandidateStore()
     private let ignoredStore = IgnoredTermStore()
@@ -16,7 +19,17 @@ struct VocabularySettingsPane: View {
 
     private var trimmedSource: String { candidateSource.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var trimmedTarget: String { candidateTarget.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var isDuplicate: Bool { isInGlossary(trimmedSource) }
+    private var addBlockReason: String? {
+        guard !trimmedSource.isEmpty else { return nil }
+        if isInGlossary(trimmedSource) { return "“\(trimmedSource)”已在词库中，可在下方直接修改。" }
+        if candidates.contains(where: { $0.source.caseInsensitiveCompare(trimmedSource) == .orderedSame }) {
+            return "“\(trimmedSource)”已在待确认候选中。"
+        }
+        if ignoredTerms.contains(where: { $0.caseInsensitiveCompare(trimmedSource) == .orderedSame }) {
+            return "“\(trimmedSource)”已忽略，可在下方恢复。"
+        }
+        return nil
+    }
 
     private func isInGlossary(_ source: String) -> Bool {
         entries.contains { $0.source.trimmingCharacters(in: .whitespacesAndNewlines).caseInsensitiveCompare(source) == .orderedSame }
@@ -25,18 +38,22 @@ struct VocabularySettingsPane: View {
     var body: some View {
         Form {
             Section {
-                TextField("英文术语", text: $candidateSource)
-                TextField("简体中文", text: $candidateTarget)
-                Button("添加到已确认词库") { confirmCandidate() }
-                    .disabled(trimmedSource.isEmpty || trimmedTarget.isEmpty || isDuplicate)
-                if isDuplicate {
-                    Text("“\(trimmedSource)”已在词库中，可在下方直接修改。")
+                TextField("英文术语", text: $candidateSource, prompt: Text("输入英文"))
+                    .onSubmit(submitAdd)
+                TextField("简体中文", text: $candidateTarget, prompt: Text("输入译文，可以先留空"))
+                    .onSubmit(submitAdd)
+                Button("添加", action: submitAdd)
+                if let addBlockReason {
+                    Text(addBlockReason)
+                        .foregroundStyle(.secondary)
+                } else if trimmedSource.isEmpty && didTryAdd {
+                    Text("请先填写英文术语。")
                         .foregroundStyle(.secondary)
                 }
             } header: {
                 Text("添加新词汇")
             } footer: {
-                Text("已确认的词汇会在 LLM 翻译时使用，仅本地翻译模式下不生效。修改在下次开始字幕时生效。其中首字母大写的人名和产品名还会在精修时作为可能听错的名字提供给模型，原文里没有原样出现时也能用来还原识别错误。")
+                Text("添加后出现在待确认候选里。")
             }
             Section {
                 Button(isAnalyzing ? "正在分析字幕历史…" : "从字幕历史分析") {
@@ -50,21 +67,35 @@ struct VocabularySettingsPane: View {
                 ForEach($candidates) { $candidate in
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text(candidate.source)
+                            TextField("英文", text: $candidate.source)
                             Image(systemName: "arrow.right").foregroundStyle(.secondary)
                             TextField("译文", text: $candidate.target)
+                        }
+                        HStack {
+                            Button(optimizingCandidateID == candidate.id ? "正在优化…" : "优化") {
+                                Task { await optimize(candidate) }
+                            }
+                            .disabled(optimizingCandidateID != nil
+                                || candidate.source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                             Button("采纳") { accept(candidate) }
                                 .disabled(isInGlossary(candidate.source)
+                                    || candidate.source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                                     || candidate.target.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                             Button("忽略") { ignore(candidate) }
                         }
                         .buttonStyle(.borderless)
                         Group {
-                            Text("来源：\(candidate.sessionDate.formatted(date: .abbreviated, time: .shortened)) 的会话")
+                            if candidate.isManual {
+                                Text("手动添加")
+                            } else {
+                                Text("来源：\(candidate.sessionDate.formatted(date: .abbreviated, time: .shortened)) 的会话")
+                            }
                             if let occurrences = candidate.occurrences {
                                 Text("出现 \(occurrences) 次")
                             }
-                            Text("示例：\(candidate.example)").lineLimit(2)
+                            if !candidate.isManual {
+                                Text("示例：\(candidate.example)").lineLimit(2)
+                            }
                             if isInGlossary(candidate.source) {
                                 Text("已在词库中，可以忽略。")
                             }
@@ -170,6 +201,48 @@ struct VocabularySettingsPane: View {
         } catch { errorMessage = error.localizedDescription }
     }
 
+    /// 表单里的输入要等焦点离开才写进状态。先结束编辑，再在下一轮读取，否则点“添加”时英文还是空的。
+    private func submitAdd() {
+        didTryAdd = true
+        NSApp.keyWindow?.makeFirstResponder(nil)
+        DispatchQueue.main.async { addCandidate() }
+    }
+
+    private func addCandidate() {
+        let existing = entries.map(\.source) + candidates.map(\.source) + ignoredTerms
+        guard let candidate = TermCandidate.addedByUser(source: trimmedSource, target: trimmedTarget, existingSources: existing) else { return }
+        candidates.append(candidate)
+        candidateSource = ""
+        candidateTarget = ""
+        didTryAdd = false
+    }
+
+    /// 用模型改英文和译文，结果仍留在待确认列表，不写入词库。
+    private func optimize(_ candidate: TermCandidate) async {
+        let target = UserDefaults.standard.string(forKey: "translation.targetLanguage")
+            .flatMap(TargetLanguage.init(rawValue:)) ?? .simplifiedChinese
+        guard let translator = CaptionSessionController.makeLLMTranslator(targetLanguage: target) else {
+            errorMessage = "还没有可用的 LLM 配置，请先在“模型”中选择配置并填写 API Key。"
+            return
+        }
+        optimizingCandidateID = candidate.id
+        defer { optimizingCandidateID = nil }
+        do {
+            let improved = try await translator.optimizeTerm(
+                source: candidate.source,
+                target: candidate.target,
+                example: candidate.example
+            )
+            guard let index = candidates.firstIndex(where: { $0.id == candidate.id }) else { return }
+            candidates[index].source = improved.source
+            candidates[index].target = improved.target
+        } catch LLMTranslatorError.malformedTermList {
+            errorMessage = "LLM 返回的内容不是有效的术语，可以再试一次。"
+        } catch {
+            errorMessage = "优化术语失败：\(error.localizedDescription)"
+        }
+    }
+
     private func accept(_ candidate: TermCandidate) {
         entries.append(GlossaryEntry(
             source: candidate.source,
@@ -196,12 +269,6 @@ struct VocabularySettingsPane: View {
     private func saveCandidates() {
         do { try candidateStore.save(candidates) }
         catch { errorMessage = error.localizedDescription }
-    }
-
-    private func confirmCandidate() {
-        entries.append(GlossaryEntry(source: trimmedSource, target: trimmedTarget))
-        candidateSource = ""
-        candidateTarget = ""
     }
 
     private func save() {

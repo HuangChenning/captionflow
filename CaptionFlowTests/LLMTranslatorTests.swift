@@ -217,6 +217,41 @@ final class LLMTranslatorTests: XCTestCase {
         }
     }
 
+    /// 优化一条候选时要能改听错的英文，并且只给出建议，不把术语写进请求里的已确认词库段。
+    func testOptimizeTermCorrectsMisheardEnglishFromTheExample() async throws {
+        let body = BodyBox()
+        let reply = #"Suggestion: {"source": "Rook's Rest", "target": "鸦栖堡"}"#
+        let responseJSON = try JSONSerialization.data(withJSONObject: ["content": [["type": "text", "text": reply]]])
+        let translator = LLMTranslator(configuration: configuration, apiKey: "test-key", glossary: [GlossaryEntry(source: "minutes", target: "会议纪要")]) { request in
+            body.value = String(decoding: request.httpBody!, as: UTF8.self)
+            return (responseJSON, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+
+        let improved = try await translator.optimizeTerm(
+            source: "Looks rest",
+            target: "看来休息",
+            example: "The rooks rest are gone."
+        )
+
+        XCTAssertEqual(improved.source, "Rook's Rest")
+        XCTAssertEqual(improved.target, "鸦栖堡")
+        let sent = try XCTUnwrap(body.value)
+        XCTAssertTrue(sent.contains("The rooks rest are gone."))
+        XCTAssertTrue(sent.contains("misheard"))
+        XCTAssertFalse(sent.contains("Approved glossary"))
+    }
+
+    func testOptimizeTermThrowsWhenReplyIsNotOneTerm() async throws {
+        let translator = translator(replying: "I would translate this as 休息.")
+
+        do {
+            _ = try await translator.optimizeTerm(source: "rest", target: "", example: "")
+            XCTFail("expected LLMTranslatorError.malformedTermList")
+        } catch LLMTranslatorError.malformedTermList {
+            // expected
+        }
+    }
+
     /// 模型常在 JSON 前后加说明文字；只要能找到术语数组就应当解析出来，而不是整次提取失败。
     func testProposeTermsParsesArrayWrappedInProse() async throws {
         let translator = translator(replying: #"Here are the terms: [{"source": "Kubernetes", "target": "Kubernetes"}, {"source": "minutes", "target": "会议纪要"}] Hope this helps."#)

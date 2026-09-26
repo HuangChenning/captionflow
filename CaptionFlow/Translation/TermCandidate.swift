@@ -24,6 +24,20 @@ struct TermCandidate: Codable, Equatable, Identifiable {
         self.occurrences = occurrences
     }
 
+    /// 用户在“添加新词汇”里输入的词。先进入待确认，不写进已确认词库。没有例句，因此不是从会话提取的。
+    /// 英文为空，或与已有词库、候选、忽略列表重复时，不添加。译文可以先空着，之后再改或优化。
+    static func addedByUser(source: String, target: String, existingSources: [String]) -> TermCandidate? {
+        let source = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        let target = target.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !source.isEmpty else { return nil }
+        guard !existingSources.contains(where: { $0.caseInsensitiveCompare(source) == .orderedSame }) else { return nil }
+        return TermCandidate(source: source, target: target, example: "", sessionDate: .now, occurrences: nil)
+    }
+
+    var isManual: Bool {
+        example.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     /// 把 LLM 的提议整理成候选。示例句和出现次数都由代码从会话原文统计，不采用 LLM 的说法：
     /// 在原文中找不到的术语视为 LLM 编造而丢弃；已在词库、已在候选列表或重复的术语也丢弃。
     static func make(
