@@ -19,7 +19,6 @@ final class CaptionSessionController: ObservableObject {
     @Published private(set) var runningApps: [NSRunningApplication] = []
 
     private let translationSessionHolder: TranslationSessionHolder
-    private let keychain = KeychainStore(service: "com.taihongteng.CaptionFlow")
     private let sessionStore = SessionStore()
     // Apple 翻译的会话需要挂在窗口里的视图上；没有主窗口后挂在字幕窗上。
     private lazy var overlay = CaptionOverlayWindowController(
@@ -209,8 +208,6 @@ final class CaptionSessionController: ObservableObject {
 
     private func makeTranslators() async -> (translator: Translator?, refiner: CaptionRefiner?) {
         let defaults = UserDefaults.standard
-        let instruction = defaults.string(forKey: "llm.instruction")
-            ?? "Translate English speech into concise, natural subtitles."
         let targetLanguage = defaults.string(forKey: "translation.targetLanguage")
             .flatMap(TargetLanguage.init(rawValue:)) ?? .simplifiedChinese
         let engineMode = defaults.string(forKey: "translation.engineMode")
@@ -220,7 +217,7 @@ final class CaptionSessionController: ObservableObject {
         let readiness = translationSessionHolder.readiness
         await readiness.refresh(target: targetLanguage)
 
-        let llmTranslator = makeLLMTranslator(instruction: instruction, targetLanguage: targetLanguage)
+        let llmTranslator = Self.makeLLMTranslator(targetLanguage: targetLanguage)
         let route = engineMode.route(localReady: readiness.isReady, llmAvailable: llmTranslator != nil)
         translationNotice = Self.notice(for: route, mode: engineMode, readiness: readiness.state, target: targetLanguage)
         sessionTarget = targetLanguage
@@ -234,7 +231,11 @@ final class CaptionSessionController: ObservableObject {
         }
     }
 
-    private func makeLLMTranslator(instruction: String, targetLanguage: TargetLanguage) -> LLMTranslator? {
+    /// 按设置中选中的 LLM 配置创建翻译器；字幕会话和字幕历史的术语提取共用。未配置或缺少 API Key 时返回 nil。
+    static func makeLLMTranslator(targetLanguage: TargetLanguage) -> LLMTranslator? {
+        let instruction = UserDefaults.standard.string(forKey: "llm.instruction")
+            ?? "Translate English speech into concise, natural subtitles."
+        let keychain = KeychainStore(service: "com.taihongteng.CaptionFlow")
         guard let selectedID = LLMProfileStore.selectedID,
               let profile = LLMProfileStore.load().first(where: { $0.id == selectedID }),
               let apiKey = try? keychain.secret(for: selectedID.uuidString), !apiKey.isEmpty,

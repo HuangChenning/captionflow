@@ -118,6 +118,51 @@ final class LLMTranslatorTests: XCTestCase {
             // expected
         }
     }
+
+    /// 模型常在 JSON 前后加说明文字；只要能找到术语数组就应当解析出来，而不是整次提取失败。
+    func testProposeTermsParsesArrayWrappedInProse() async throws {
+        let translator = translator(replying: #"Here are the terms: [{"source": "Kubernetes", "target": "Kubernetes"}, {"source": "minutes", "target": "会议纪要"}] Hope this helps."#)
+
+        let terms = try await translator.proposeTerms(for: [caption("We deployed it on Kubernetes", "我们部署到了 Kubernetes")])
+
+        XCTAssertEqual(terms.map(\.source), ["Kubernetes", "minutes"])
+        XCTAssertEqual(terms.map(\.target), ["Kubernetes", "会议纪要"])
+    }
+
+    /// 回复无法解析时必须报错，否则用户会误以为这场会话里没有术语。
+    func testProposeTermsThrowsWhenReplyIsNotATermList() async throws {
+        let translator = translator(replying: "I could not find any terms.")
+
+        do {
+            _ = try await translator.proposeTerms(for: [caption("hello", "你好")])
+            XCTFail("expected LLMTranslatorError.malformedTermList")
+        } catch LLMTranslatorError.malformedTermList {
+            // expected
+        }
+    }
+
+    /// LLM 要看到原文和已有译文，才能判断哪些术语需要统一译法。
+    func testProposeTermsSendsTranscriptWithTranslations() async throws {
+        let body = try await capturedRequestBody(glossary: []) {
+            // 模拟回复不是术语列表，这里只检查发出的请求内容。
+            _ = try? await $0.proposeTerms(for: [caption("the minutes", "分钟"), Caption(id: UUID(), english: "no translation", chinese: nil, isProvisional: false, createdAt: .now)])
+            return ""
+        }
+
+        XCTAssertTrue(body.contains("EN: the minutes\\nTranslation: 分钟"))
+        XCTAssertTrue(body.contains("EN: no translation"))
+    }
+
+    private func translator(replying text: String) -> LLMTranslator {
+        let responseJSON = try! JSONSerialization.data(withJSONObject: ["content": [["type": "text", "text": text]]])
+        return LLMTranslator(configuration: configuration, apiKey: "test-key") { request in
+            (responseJSON, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+    }
+
+    private func caption(_ english: String, _ chinese: String) -> Caption {
+        Caption(id: UUID(), english: english, chinese: chinese, isProvisional: false, createdAt: .now)
+    }
 }
 
 private final class BodyBox: @unchecked Sendable {
