@@ -31,6 +31,25 @@ final class CaptionPipelineTests: XCTestCase {
         XCTAssertFalse(pipeline.captions[0].isProvisional)
     }
 
+    /// 没有可用翻译时仍要显示英文字幕，而不是停止或一直等待译文。
+    func testWithoutTranslatorShowsEnglishOnlyAndKeepsRunning() async throws {
+        let pipeline = CaptionPipeline(
+            audioSource: FakeAudioSource(chunks: [[0.1, 0.2, 0.3, 0.4]]),
+            asr: FakeASR { _ in "hello" },
+            translator: nil,
+            minChunkDuration: 1,
+            sampleRate: 4
+        )
+
+        await pipeline.start()
+        await pipeline.pumpTask?.value
+
+        XCTAssertEqual(pipeline.state, .running)
+        XCTAssertEqual(pipeline.captions.map(\.english), ["hello"])
+        XCTAssertNil(pipeline.captions[0].chinese)
+        XCTAssertFalse(pipeline.captions[0].isProvisional, "the caption is final; the overlay must not show a pending translation")
+    }
+
     func testLocalDraftShowsFirstThenRefinerReplacesIt() async throws {
         let gate = Gate()
         let pipeline = CaptionPipeline(
@@ -119,6 +138,82 @@ final class CaptionPipelineTests: XCTestCase {
         XCTAssertEqual(pipeline.state, .running, "an LLM failure must not stop captions when a local translation exists")
         XCTAssertEqual(pipeline.captions[0].chinese, "本地译文")
         XCTAssertFalse(pipeline.captions[0].isProvisional)
+    }
+
+    /// 会话中翻译出错时保留英文字幕继续运行：翻译不可用不应让用户连英文也看不到。
+    func testTranslationErrorKeepsEnglishAndLaterSpeechRecovers() async throws {
+        struct StubError: LocalizedError { var errorDescription: String? { "资源已被移除" } }
+        let pipeline = CaptionPipeline(
+            audioSource: FakeAudioSource(chunks: [[1, 1, 1, 1], [2, 2, 2, 2]]),
+            asr: FakeASR { samples in samples[0] == 1 ? "first" : "second" },
+            translator: FakeTranslator { text in
+                if text == "first" { throw StubError() }
+                return "第二句"
+            },
+            minChunkDuration: 1,
+            sampleRate: 4
+        )
+        var errorsSeen: [String?] = []
+        let observation = pipeline.$translationError.sink { errorsSeen.append($0) }
+        defer { observation.cancel() }
+
+        await pipeline.start()
+        await pipeline.pumpTask?.value
+
+        XCTAssertEqual(pipeline.state, .running)
+        XCTAssertNil(pipeline.captions[0].chinese)
+        XCTAssertFalse(pipeline.captions[0].isProvisional)
+        XCTAssertEqual(pipeline.captions[1].chinese, "第二句")
+        XCTAssertTrue(errorsSeen.contains("资源已被移除"), "the failure reason must be surfaced to the overlay")
+        XCTAssertNil(pipeline.translationError, "a later successful translation clears the error")
+    }
+
+    func testLocalAndRefinerBothFailingKeepsEnglishAndKeepsRunning() async throws {
+        struct StubError: Error {}
+        let pipeline = CaptionPipeline(
+            audioSource: FakeAudioSource(chunks: [[0.1, 0.2, 0.3, 0.4]]),
+            asr: FakeASR { _ in "hello" },
+            translator: FakeTranslator { _ in throw StubError() },
+            refiner: FakeTranslator { _ in throw StubError() },
+            minChunkDuration: 1,
+            sampleRate: 4
+        )
+
+        await pipeline.start()
+        await pipeline.pumpTask?.value
+        for task in pipeline.refineTasks.values { await task.value }
+
+        XCTAssertEqual(pipeline.state, .running)
+        XCTAssertNil(pipeline.captions[0].chinese)
+        XCTAssertFalse(pipeline.captions[0].isProvisional)
+        XCTAssertNotNil(pipeline.translationError)
+    }
+
+    /// 本地资源在会话中下载完成后，之后的语音应使用新翻译，而不必重新开始字幕。
+    func testUpdateTranslationAppliesToLaterSpeech() async throws {
+        let box = PipelineBox()
+        let pipeline = CaptionPipeline(
+            audioSource: FakeAudioSource(chunks: [[1, 1, 1, 1], [2, 2, 2, 2]]),
+            asr: FakeASR { samples in
+                if samples[0] == 2 {
+                    await MainActor.run {
+                        box.pipeline?.updateTranslation(translator: FakeTranslator { _ in "本地译文" }, refiner: nil)
+                    }
+                    return "second"
+                }
+                return "first"
+            },
+            translator: nil,
+            minChunkDuration: 1,
+            sampleRate: 4
+        )
+        box.pipeline = pipeline
+
+        await pipeline.start()
+        await pipeline.pumpTask?.value
+
+        XCTAssertNil(pipeline.captions[0].chinese, "captions before the switch stay English-only")
+        XCTAssertEqual(pipeline.captions[1].chinese, "本地译文")
     }
 
     func testBuffersAudioUntilMinimumChunkDurationReached() async throws {
@@ -281,6 +376,11 @@ private struct FakeRefiner: CaptionRefiner {
     func refine(english: String, localDraft: String?) async throws -> String {
         try await handler(english, localDraft)
     }
+}
+
+@MainActor
+private final class PipelineBox: @unchecked Sendable {
+    var pipeline: CaptionPipeline?
 }
 
 /// 让 refiner 停在 wait()，直到测试调用 open()。

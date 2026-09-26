@@ -32,10 +32,6 @@ final class TranslationSessionHolder: ObservableObject {
         if let session { return session }
         return await withCheckedContinuation { waiters.append($0) }
     }
-
-    func prepareTranslation() async {
-        await readiness.prepare(using: await session())
-    }
 }
 
 @available(macOS 15.0, *)

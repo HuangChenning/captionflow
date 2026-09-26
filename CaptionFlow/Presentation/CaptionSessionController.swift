@@ -13,6 +13,8 @@ final class CaptionSessionController: ObservableObject {
     @Published private(set) var isPreparing = false
     @Published private(set) var pipeline: CaptionPipeline?
     @Published private(set) var errorMessage: String?
+    /// 本地翻译不可用、本次会话改用 LLM 或只显示英文时的说明。
+    @Published private(set) var translationNotice: String?
     /// 可作为“单个应用”音频源的正在运行的应用。
     @Published private(set) var runningApps: [NSRunningApplication] = []
 
@@ -25,6 +27,9 @@ final class CaptionSessionController: ObservableObject {
             .background(AppleTranslationHostView(holder: translationSessionHolder))
     )
     private var pipelineStateObservation: AnyCancellable?
+    private var readinessObservation: AnyCancellable?
+    /// 当前会话的目标语言；下载的资源语言与它一致时才切换到本地翻译。
+    private var sessionTarget: TargetLanguage?
     private let hotKeys = GlobalHotKeys()
 
     init(translationSessionHolder: TranslationSessionHolder) {
@@ -45,6 +50,15 @@ final class CaptionSessionController: ObservableObject {
             }
         }
         refreshRunningApps()
+        // 启动时就检查本地翻译资源，菜单和设置页不必等到开始字幕才知道状态。
+        let target = UserDefaults.standard.string(forKey: "translation.targetLanguage")
+            .flatMap(TargetLanguage.init(rawValue:)) ?? .simplifiedChinese
+        Task { await translationSessionHolder.readiness.refresh(target: target) }
+        readinessObservation = translationSessionHolder.readiness.$state.sink { [weak self] state in
+            guard state == .installed else { return }
+            // sink 在 state 赋值前触发，放到下一轮再读取最新状态。
+            Task { @MainActor in await self?.switchToLocalTranslationIfNeeded() }
+        }
         let workspaceCenter = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
             workspaceCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
@@ -87,7 +101,7 @@ final class CaptionSessionController: ObservableObject {
 
         do {
             let asr = try await WhisperKitEnglishASR.load()
-            let translators = makeTranslators()
+            let translators = await makeTranslators()
             let newPipeline = CaptionPipeline(
                 audioSource: sourceKind.makeSource(appBundleID: systemAudioAppBundleID),
                 asr: asr,
@@ -108,6 +122,8 @@ final class CaptionSessionController: ObservableObject {
 
     func stop() async {
         pipelineStateObservation = nil
+        translationNotice = nil
+        sessionTarget = nil
         let captions = pipeline?.captions ?? []
         await pipeline?.stop()
         pipeline = nil
@@ -178,7 +194,20 @@ final class CaptionSessionController: ObservableObject {
     }
 
     /// 自动模式下本地翻译先显示，LLM 结果到达后替换（refiner）。
-    private func makeTranslators() -> (translator: Translator, refiner: CaptionRefiner?) {
+    /// 本地资源未就绪时不使用本地翻译，改用 LLM 或只显示英文，并通过 translationNotice 说明原因。
+    /// 会话进行中本地资源下载完成时，之后的语音改用本地翻译，不必重新开始字幕。
+    private func switchToLocalTranslationIfNeeded() async {
+        let readiness = translationSessionHolder.readiness
+        // translationNotice 非 nil 表示本次会话因资源不可用跳过了本地翻译；切换后它会变为 nil，不会重复切换。
+        guard let pipeline, translationNotice != nil, readiness.isReady,
+              readiness.target == sessionTarget else { return }
+        let translators = await makeTranslators()
+        // makeTranslators 期间会话可能已停止或被替换。
+        guard self.pipeline === pipeline else { return }
+        pipeline.updateTranslation(translator: translators.translator, refiner: translators.refiner)
+    }
+
+    private func makeTranslators() async -> (translator: Translator?, refiner: CaptionRefiner?) {
         let defaults = UserDefaults.standard
         let instruction = defaults.string(forKey: "llm.instruction")
             ?? "Translate English speech into concise, natural subtitles."
@@ -188,25 +217,62 @@ final class CaptionSessionController: ObservableObject {
             .flatMap(TranslationEngineMode.init(rawValue:)) ?? .auto
 
         translationSessionHolder.updateTarget(targetLanguage.locale)
-        let fallback = AppleTranslator(holder: translationSessionHolder)
+        let readiness = translationSessionHolder.readiness
+        await readiness.refresh(target: targetLanguage)
 
-        guard engineMode != .localOnly else { return (fallback, nil) }
+        let llmTranslator = makeLLMTranslator(instruction: instruction, targetLanguage: targetLanguage)
+        let route = engineMode.route(localReady: readiness.isReady, llmAvailable: llmTranslator != nil)
+        translationNotice = Self.notice(for: route, mode: engineMode, readiness: readiness.state, target: targetLanguage)
+        sessionTarget = targetLanguage
 
+        let local = AppleTranslator(holder: translationSessionHolder)
+        switch route {
+        case .localThenLLM: return (local, llmTranslator)
+        case .localOnly: return (local, nil)
+        case .llmOnly: return (llmTranslator, nil)
+        case .englishOnly: return (nil, nil)
+        }
+    }
+
+    private func makeLLMTranslator(instruction: String, targetLanguage: TargetLanguage) -> LLMTranslator? {
         guard let selectedID = LLMProfileStore.selectedID,
               let profile = LLMProfileStore.load().first(where: { $0.id == selectedID }),
               let apiKey = try? keychain.secret(for: selectedID.uuidString), !apiKey.isEmpty,
               let configuration = LLMConfiguration(baseURL: profile.baseURL, model: profile.model, instruction: instruction) else {
-            return (fallback, nil)
+            return nil
         }
-
-        let llmTranslator = LLMTranslator(
+        return LLMTranslator(
             configuration: configuration,
             apiKey: apiKey,
             style: profile.apiStyle,
             targetLanguageName: targetLanguage.displayName,
             glossary: (try? GlossaryStore().load()) ?? []
         )
+    }
 
-        return engineMode == .llmOnly ? (llmTranslator, nil) : (fallback, llmTranslator)
+    /// 本地翻译本应参与却因资源不可用被跳过时给出的说明；其余情况返回 nil。
+    static func notice(
+        for route: TranslationRoute,
+        mode: TranslationEngineMode,
+        readiness: LocalTranslationReadiness.State,
+        target: TargetLanguage
+    ) -> String? {
+        let fallback: String
+        switch route {
+        case .localThenLLM, .localOnly: return nil
+        case .llmOnly:
+            // 用户选了仅 LLM 时本来就不用本地翻译，无需提示。
+            guard mode != .llmOnly else { return nil }
+            fallback = "本次使用 LLM 翻译。"
+        case .englishOnly:
+            fallback = "本次只显示英文字幕。"
+        }
+        let pair = "英语到\(target.displayName)"
+        switch readiness {
+        case .downloadable: return "\(pair)的本地翻译资源尚未下载，\(fallback)可在“翻译设置”中下载。"
+        case .unsupported: return "此设备不支持\(pair)的本地翻译，\(fallback)"
+        case .failed(let reason): return "本地翻译资源检查失败：\(reason)。\(fallback)"
+        case .checking, .installed: return "\(pair)的本地翻译暂不可用，\(fallback)"
+        }
     }
 }

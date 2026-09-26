@@ -17,6 +17,11 @@ struct MenuBarMenu: View {
             }
             Divider()
         }
+        if let translationNotice = controller.translationNotice {
+            Text(translationNotice)
+            Button("打开翻译设置…") { openSettings() }
+            Divider()
+        }
 
         Button(sessionButtonTitle) {
             Task { await controller.toggleSession() }

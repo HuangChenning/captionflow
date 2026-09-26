@@ -107,7 +107,7 @@ struct CaptionOverlayView: View {
     var body: some View {
         Group {
             if let pipeline = session.pipeline {
-                CaptionOverlayContent(pipeline: pipeline)
+                CaptionOverlayContent(pipeline: pipeline, notice: session.translationNotice)
             } else {
                 OverlayHint(text: session.isPreparing ? "准备中…" : session.errorMessage ?? "字幕已停止")
             }
@@ -124,6 +124,7 @@ struct CaptionOverlayView: View {
 
 private struct CaptionOverlayContent: View {
     @ObservedObject var pipeline: CaptionPipeline
+    let notice: String?
     @AppStorage(CaptionOverlaySettings.translationFontSizeKey) private var translationFontSize = CaptionOverlaySettings.defaultTranslationFontSize
     @AppStorage(CaptionOverlaySettings.originalFontSizeKey) private var originalFontSize = CaptionOverlaySettings.defaultOriginalFontSize
     @AppStorage(CaptionOverlaySettings.showsOriginalKey) private var showsOriginal = true
@@ -141,9 +142,14 @@ private struct CaptionOverlayContent: View {
                         .font(.system(size: originalFontSize))
                         .foregroundStyle(textColor.opacity(0.75))
                 }
-                Text(caption.chinese ?? "…")
-                    .font(.system(size: translationFontSize, weight: .semibold))
-                    .foregroundStyle(textColor)
+                // 译文未到时显示“…”；只显示英文时没有译文，不显示这一行。
+                if caption.chinese != nil || caption.isProvisional {
+                    Text(caption.chinese ?? "…")
+                        .font(.system(size: translationFontSize, weight: .semibold))
+                        .foregroundStyle(textColor)
+                } else if let translationError = pipeline.translationError {
+                    OverlayHint(text: "翻译失败，仅显示英文：\(translationError)")
+                }
             }
             .multilineTextAlignment(.center)
             .lineLimit(2)
@@ -151,7 +157,7 @@ private struct CaptionOverlayContent: View {
         } else if case .failed = pipeline.state {
             OverlayHint(text: "字幕已中断")
         } else {
-            OverlayHint(text: "等待语音…")
+            OverlayHint(text: notice.map { "等待语音…\n\($0)" } ?? "等待语音…")
         }
     }
 }
