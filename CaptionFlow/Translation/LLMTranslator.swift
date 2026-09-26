@@ -4,6 +4,7 @@ enum LLMTranslatorError: Error, Equatable {
     case emptyAPIKey
     case httpStatus(Int)
     case emptyResponse
+    case malformedTermList
 }
 
 struct LLMTranslator: Translator, CaptionRefiner {
@@ -44,6 +45,30 @@ struct LLMTranslator: Translator, CaptionRefiner {
         prompt += glossarySection(for: english)
         prompt += "\n\nReply with only the final subtitle text."
         return try await send(prompt)
+    }
+
+    /// 让 LLM 从整场会话中列出需要统一译法的术语。只返回 LLM 的提议，是否采用由用户决定。
+    func proposeTerms(for captions: [Caption]) async throws -> [GlossaryEntry] {
+        let transcript = captions.map { caption in
+            caption.chinese.map { "EN: \(caption.english)\nTranslation: \($0)" } ?? "EN: \(caption.english)"
+        }.joined(separator: "\n")
+        let prompt = """
+        Below is an English speech transcript with its subtitles. List domain terms, product names, \
+        and proper nouns whose translation should stay consistent in future subtitles. \
+        Use the exact English spelling from the transcript.
+        Reply with only a JSON array like [{"source": "English term", "target": "translation"}]. \
+        Reply [] if there are none.
+
+        Transcript:
+        \(transcript)
+        """
+        let reply = try await send(prompt)
+        // 模型可能在 JSON 前后加说明文字，只取第一个 [ 到最后一个 ] 之间的内容。
+        guard let start = reply.firstIndex(of: "["), let end = reply.lastIndex(of: "]"), start < end,
+              let terms = try? JSONDecoder().decode([ProposedTerm].self, from: Data(reply[start...end].utf8)) else {
+            throw LLMTranslatorError.malformedTermList
+        }
+        return terms.map { GlossaryEntry(source: $0.source, target: $0.target) }
     }
 
     /// 只附带原文里出现过的已确认术语，词库变大时不会撑大每个请求。
@@ -134,6 +159,11 @@ struct LLMTranslator: Translator, CaptionRefiner {
         }
         return translated
     }
+}
+
+private struct ProposedTerm: Decodable {
+    let source: String
+    let target: String
 }
 
 private struct AnthropicMessagesRequest: Encodable {
