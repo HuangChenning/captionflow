@@ -429,10 +429,7 @@ private struct UpdateSettingsPane: View {
     @State private var lastCheckDate: Date?
 
     private var versionText: String {
-        let info = Bundle.main.infoDictionary
-        let version = info?["CFBundleShortVersionString"] as? String ?? "-"
-        let build = info?["CFBundleVersion"] as? String ?? "-"
-        return "\(version) (\(build))"
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-"
     }
 
     var body: some View {
