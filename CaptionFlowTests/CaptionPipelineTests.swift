@@ -328,6 +328,76 @@ final class CaptionPipelineTests: XCTestCase {
         XCTAssertEqual(pipeline.captions.map(\.english), ["hello"])
     }
 
+    // 固定时长硬切会把 "GitHub" 切成 "Git" 和 "Hub"，后半段常被丢掉；应切在句间的长停顿处，停顿后的语音留给下一个窗口。
+    func testWindowIsCutAtALongPause() async throws {
+        let audio = speech(70) + silence(60) + speech(30)
+
+        let transcribed = await transcribedWindows(of: [audio])
+
+        XCTAssertEqual(transcribed, [Array(audio[..<95])], "cut in the middle of the first 0.5 s of the pause")
+    }
+
+    // 词间短停顿处切会把 "Microsoft Build" 切开（"built in Seattle" 译成“在西雅图制造”），所以要跳过短停顿、等句间长停顿。
+    func testShortPauseBetweenWordsIsSkippedForALongPause() async throws {
+        let audio = speech(80) + silence(20) + speech(40) + silence(60) + speech(10)
+
+        let transcribed = await transcribedWindows(of: [audio])
+
+        XCTAssertEqual(transcribed.map(\.count), [165])
+    }
+
+    // 到最长长度仍没有长停顿时，退而切在最长的停顿处，而不是在词中间硬切。
+    func testWithoutALongPauseTheLongestPauseIsUsedAtTheMaximumLength() async throws {
+        let audio = speech(70) + silence(10) + speech(40) + silence(30) + speech(60)
+
+        let transcribed = await transcribedWindows(of: [audio])
+
+        XCTAssertEqual(transcribed.map(\.count), [135])
+    }
+
+    // 句间停顿后的静音若算进下一个窗口，下一句还没说完窗口就到了最长长度，只能在词间切开。
+    func testLeadingSilenceDoesNotCountTowardTheWindowLength() async throws {
+        let audio = silence(150) + speech(180) + silence(60)
+
+        let transcribed = await transcribedWindows(of: [audio])
+
+        XCTAssertEqual(transcribed, [speech(180) + silence(25)])
+    }
+
+    // 一直没有停顿时不能无限等下去，否则字幕会停住；达到最长长度就硬切。
+    func testSpeechWithoutPauseIsCutAtTheMaximumLength() async throws {
+        let transcribed = await transcribedWindows(of: Array(repeating: speech(50), count: 5))
+
+        XCTAssertEqual(transcribed.map(\.count), [200])
+    }
+
+    private func speech(_ count: Int) -> [Float] {
+        (0..<count).map { $0.isMultiple(of: 2) ? 0.1 : -0.1 }
+    }
+
+    private func silence(_ count: Int) -> [Float] {
+        [Float](repeating: 0, count: count)
+    }
+
+    /// 100 Hz 采样：最短 1 秒（100 个采样），长停顿 0.5 秒（50 个采样），最长 2 秒（200 个采样）。
+    private func transcribedWindows(of chunks: [[Float]]) async -> [[Float]] {
+        var transcribed: [[Float]] = []
+        let pipeline = CaptionPipeline(
+            audioSource: FakeAudioSource(chunks: chunks),
+            asr: FakeASR { samples in
+                transcribed.append(samples)
+                return "hello"
+            },
+            translator: FakeTranslator { _ in "你好" },
+            minChunkDuration: 1,
+            sampleRate: 100,
+            maxChunkDuration: 2
+        )
+        await pipeline.start()
+        await pipeline.pumpTask?.value
+        return transcribed
+    }
+
     func testTranscriptionErrorTransitionsToFailedAndStopsAudioSource() async throws {
         struct StubError: Error {}
         let audioSource = FakeAudioSource(chunks: [[0.1, 0.2, 0.3, 0.4]])
