@@ -40,8 +40,12 @@ struct LLMTranslator: Translator, CaptionRefiner {
         try await send(text + glossarySection(for: text))
     }
 
-    func refine(english: String, localDraft: String?) async throws -> String {
-        var prompt = "English source:\n\(english)"
+    func refine(english: String, localDraft: String?, previousEnglish: String?) async throws -> String {
+        var prompt = ""
+        if let previousEnglish {
+            prompt += "Previous subtitle, for context only (do not translate it):\n\(previousEnglish)\n\n"
+        }
+        prompt += "English source:\n\(english)"
         if let localDraft {
             prompt += "\n\nLocal draft translation (correct it if needed):\n\(localDraft)"
         }
