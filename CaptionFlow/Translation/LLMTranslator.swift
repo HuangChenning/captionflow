@@ -141,6 +141,7 @@ struct LLMTranslator: Translator, CaptionRefiner {
             AnthropicMessagesRequest(
                 model: configuration.model,
                 maxTokens: 1024,
+                thinking: AnthropicThinking(type: "disabled"),
                 messages: [AnthropicMessage(role: "user", content: "\(systemInstruction)\n\n\(text)")]
             )
         )
@@ -195,13 +196,20 @@ private struct ProposedTerm: Decodable {
 private struct AnthropicMessagesRequest: Encodable {
     let model: String
     let maxTokens: Int
+    /// 字幕翻译不需要思考；默认开启思考的模型（如 deepseek-v4-flash）会把 max_tokens 用在思考上，返回没有译文的回复。
+    let thinking: AnthropicThinking
     let messages: [AnthropicMessage]
 
     enum CodingKeys: String, CodingKey {
         case model
         case maxTokens = "max_tokens"
+        case thinking
         case messages
     }
+}
+
+private struct AnthropicThinking: Encodable {
+    let type: String
 }
 
 private struct AnthropicMessage: Codable {

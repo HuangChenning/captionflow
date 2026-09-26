@@ -12,7 +12,7 @@ CaptionFlow is a macOS app that shows live translated captions for English audio
 | --- | --- |
 | Audio sources | Microphone, all system audio, or the audio of one app |
 | Menu bar | Start/stop, audio source, target language, and settings from one menu bar icon |
-| Caption window | Floating, draggable, resizable window that stays on top; font size, color, and background opacity are adjustable |
+| Caption window | Floating, draggable, resizable window that stays on top; font size, color, and background opacity are adjustable, and it can show the last 1–5 captions |
 | Shortcuts | Customizable global shortcuts; defaults are ⌃⌥S start/stop, ⌃⌥H show/hide the caption window, ⌃⌥M move it to the next screen, ⌃⌥A switch audio source |
 | Speech recognition | WhisperKit `base.en`, English only, runs locally |
 | Translation | Your LLM (Anthropic or OpenAI-compatible), with Apple Translation shown first; or local-only / LLM-only modes |
