@@ -17,6 +17,8 @@ final class CaptionPipeline: ObservableObject {
     /// 设置后，translator 的结果先作为临时译文显示，refiner 的结果到达后替换它。
     private var refiner: CaptionRefiner?
     private let minChunkSamples: Int
+    /// 窗口 RMS 低于此值视为静音，不送识别。Whisper 在静音上常输出 "you" 之类的幻觉文本。
+    private let silenceRMSThreshold: Float
 
     private(set) var pumpTask: Task<Void, Never>?
     private(set) var refineTasks: [UUID: Task<Void, Never>] = [:]
@@ -27,13 +29,15 @@ final class CaptionPipeline: ObservableObject {
         translator: Translator?,
         refiner: CaptionRefiner? = nil,
         minChunkDuration: TimeInterval = 3,
-        sampleRate: Double = 16_000
+        sampleRate: Double = 16_000,
+        silenceRMSThreshold: Float = 0.005
     ) {
         self.audioSource = audioSource
         self.asr = asr
         self.translator = translator
         self.refiner = refiner
         self.minChunkSamples = Int(minChunkDuration * sampleRate)
+        self.silenceRMSThreshold = silenceRMSThreshold
     }
 
     /// 会话中途更换翻译方式（例如本地资源下载完成后），只影响之后的语音。
@@ -79,6 +83,7 @@ final class CaptionPipeline: ObservableObject {
     }
 
     private func transcribeAndTranslate(_ samples: [Float]) async {
+        guard rms(samples) >= silenceRMSThreshold else { return }
         let english: String
         do {
             english = try await asr.transcribe(samples: samples)
@@ -179,4 +184,9 @@ final class CaptionPipeline: ObservableObject {
         await audioSource.stop()
         state = .failed(error.localizedDescription)
     }
+}
+
+func rms(_ samples: [Float]) -> Float {
+    guard !samples.isEmpty else { return 0 }
+    return (samples.reduce(0) { $0 + $1 * $1 } / Float(samples.count)).squareRoot()
 }

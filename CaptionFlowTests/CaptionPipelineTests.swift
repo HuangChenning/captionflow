@@ -284,6 +284,50 @@ final class CaptionPipelineTests: XCTestCase {
         XCTAssertTrue(pipeline.captions.isEmpty)
     }
 
+    // 静音窗口若送进 Whisper 会得到 "you" 等幻觉文本，并为每个窗口触发一次翻译和 LLM 请求。
+    func testSilentAudioIsNotTranscribed() async throws {
+        let audioSource = FakeAudioSource(chunks: [[0, 0.001, -0.001, 0]])
+        let asr = FakeASR { _ in
+            XCTFail("must not transcribe silence")
+            return "you"
+        }
+        let pipeline = CaptionPipeline(
+            audioSource: audioSource,
+            asr: asr,
+            translator: FakeTranslator { _ in "你" },
+            minChunkDuration: 1,
+            sampleRate: 4
+        )
+
+        await pipeline.start()
+        await pipeline.pumpTask?.value
+
+        XCTAssertTrue(pipeline.captions.isEmpty)
+    }
+
+    // 门限只挡静音，不能把音量较低的语音也丢掉。
+    func testQuietSpeechAfterSilenceIsStillTranscribed() async throws {
+        let audioSource = FakeAudioSource(chunks: [[0, 0, 0, 0], [0.02, -0.02, 0.02, -0.02]])
+        var transcribed: [[Float]] = []
+        let asr = FakeASR { samples in
+            transcribed.append(samples)
+            return "hello"
+        }
+        let pipeline = CaptionPipeline(
+            audioSource: audioSource,
+            asr: asr,
+            translator: FakeTranslator { _ in "你好" },
+            minChunkDuration: 1,
+            sampleRate: 4
+        )
+
+        await pipeline.start()
+        await pipeline.pumpTask?.value
+
+        XCTAssertEqual(transcribed, [[0.02, -0.02, 0.02, -0.02]])
+        XCTAssertEqual(pipeline.captions.map(\.english), ["hello"])
+    }
+
     func testTranscriptionErrorTransitionsToFailedAndStopsAudioSource() async throws {
         struct StubError: Error {}
         let audioSource = FakeAudioSource(chunks: [[0.1, 0.2, 0.3, 0.4]])
