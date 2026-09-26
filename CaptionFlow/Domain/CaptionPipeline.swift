@@ -7,7 +7,8 @@ final class CaptionPipeline: ObservableObject {
 
     private let audioSource: AudioSource
     private let asr: EnglishASR
-    private let translator: Translator
+    /// nil 表示没有可用的翻译，只显示英文字幕。
+    private let translator: Translator?
     /// 设置后，translator 的结果先作为临时译文显示，refiner 的结果到达后替换它。
     private let refiner: CaptionRefiner?
     private let minChunkSamples: Int
@@ -18,7 +19,7 @@ final class CaptionPipeline: ObservableObject {
     init(
         audioSource: AudioSource,
         asr: EnglishASR,
-        translator: Translator,
+        translator: Translator?,
         refiner: CaptionRefiner? = nil,
         minChunkDuration: TimeInterval = 3,
         sampleRate: Double = 16_000
@@ -74,6 +75,10 @@ final class CaptionPipeline: ObservableObject {
             let caption = Caption(id: UUID(), english: english, chinese: nil, isProvisional: true, createdAt: .now)
             captions.append(caption)
 
+            guard let translator else {
+                captions[captions.count - 1].isProvisional = false
+                return
+            }
             guard let refiner else {
                 let chinese = try await translator.translate(english)
                 updateCaption(id: caption.id, chinese: chinese, isProvisional: false)

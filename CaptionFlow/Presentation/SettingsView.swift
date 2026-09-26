@@ -1,6 +1,7 @@
 import Carbon.HIToolbox
 import Sparkle
 import SwiftUI
+import Translation
 
 private enum SettingsSection: String, CaseIterable, Identifiable {
     case launch, textAppearance, display, translation, models, history, shortcuts, vocabulary, updates, about
@@ -273,6 +274,8 @@ private struct TranslationSettingsPane: View {
     @ObservedObject var holder: TranslationSessionHolder
     @AppStorage("translation.targetLanguage") private var targetLanguageRaw = TargetLanguage.simplifiedChinese.rawValue
     @AppStorage("translation.engineMode") private var engineModeRaw = TranslationEngineMode.auto.rawValue
+    /// 非 nil 时 translationTask 提供会话并下载资源。
+    @State private var downloadConfiguration: TranslationSession.Configuration?
 
     var body: some View {
         Form {
@@ -295,24 +298,41 @@ private struct TranslationSettingsPane: View {
             Section("本地翻译资源") {
                 Text(resourceMessage)
                 if case .downloadable = holder.readiness.state {
-                    Button("下载英语到简体中文资源") { Task { await holder.prepareTranslation() } }
+                    Button("下载英语到\(targetLanguage.displayName)资源") {
+                        downloadConfiguration = TranslationSession.Configuration(
+                            source: Locale.Language(identifier: "en"),
+                            target: targetLanguage.locale
+                        )
+                    }
+                    .disabled(downloadConfiguration != nil)
                 }
                 if case .failed = holder.readiness.state {
-                    Button("重新检查") { Task { await holder.readiness.refresh() } }
+                    Button("重新检查") { Task { await holder.readiness.refresh(target: targetLanguage) } }
                 }
             }
         }
-        .onAppear { Task { await holder.readiness.refresh() } }
+        .onAppear { Task { await holder.readiness.refresh(target: targetLanguage) } }
+        .onChange(of: targetLanguageRaw) { Task { await holder.readiness.refresh(target: targetLanguage) } }
+        // 下载需要挂在可见视图上的会话；用设置页自己的会话，不依赖字幕窗是否打开过。
+        .translationTask(downloadConfiguration) { session in
+            await holder.readiness.prepare { try await session.prepareTranslation() }
+            downloadConfiguration = nil
+        }
         .formStyle(.grouped)
         .navigationTitle("翻译设置")
     }
 
+    private var targetLanguage: TargetLanguage {
+        TargetLanguage(rawValue: targetLanguageRaw) ?? .simplifiedChinese
+    }
+
     private var resourceMessage: String {
+        let pair = "英语到\(holder.readiness.target.displayName)"
         switch holder.readiness.state {
         case .checking: return "正在检查…"
-        case .installed: return "英语到简体中文本地资源已安装。"
-        case .downloadable: return "资源可下载；下载后可离线进行本地翻译。"
-        case .unsupported: return "此设备不支持该本地翻译语言组合。"
+        case .installed: return "\(pair)本地资源已安装。"
+        case .downloadable: return "\(pair)资源可下载；下载后可离线进行本地翻译。"
+        case .unsupported: return "此设备不支持\(pair)的本地翻译。"
         case .failed(let reason): return "资源检查或下载失败：\(reason)"
         }
     }

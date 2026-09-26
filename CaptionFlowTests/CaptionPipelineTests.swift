@@ -31,6 +31,25 @@ final class CaptionPipelineTests: XCTestCase {
         XCTAssertFalse(pipeline.captions[0].isProvisional)
     }
 
+    /// 没有可用翻译时仍要显示英文字幕，而不是停止或一直等待译文。
+    func testWithoutTranslatorShowsEnglishOnlyAndKeepsRunning() async throws {
+        let pipeline = CaptionPipeline(
+            audioSource: FakeAudioSource(chunks: [[0.1, 0.2, 0.3, 0.4]]),
+            asr: FakeASR { _ in "hello" },
+            translator: nil,
+            minChunkDuration: 1,
+            sampleRate: 4
+        )
+
+        await pipeline.start()
+        await pipeline.pumpTask?.value
+
+        XCTAssertEqual(pipeline.state, .running)
+        XCTAssertEqual(pipeline.captions.map(\.english), ["hello"])
+        XCTAssertNil(pipeline.captions[0].chinese)
+        XCTAssertFalse(pipeline.captions[0].isProvisional, "the caption is final; the overlay must not show a pending translation")
+    }
+
     func testLocalDraftShowsFirstThenRefinerReplacesIt() async throws {
         let gate = Gate()
         let pipeline = CaptionPipeline(
