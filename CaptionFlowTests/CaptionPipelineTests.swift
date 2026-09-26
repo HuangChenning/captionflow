@@ -86,7 +86,7 @@ final class CaptionPipelineTests: XCTestCase {
             audioSource: FakeAudioSource(chunks: [[0.1, 0.2, 0.3, 0.4]]),
             asr: FakeASR { _ in "the minutes" },
             translator: FakeTranslator { _ in "分钟" },
-            refiner: FakeRefiner { english, draft in
+            refiner: FakeRefiner { english, draft, _ in
                 XCTAssertEqual(english, "the minutes")
                 XCTAssertEqual(draft, "分钟")
                 return "会议纪要"
@@ -100,6 +100,30 @@ final class CaptionPipelineTests: XCTestCase {
         for task in pipeline.refineTasks.values { await task.value }
 
         XCTAssertEqual(pipeline.captions[0].chinese, "会议纪要")
+    }
+
+    /// 真人对白常在句中停顿处被切开（"strategies of battle" / "or their execution"），
+    /// 后半句单独精修会译错（execution 译成“处决”），所以精修要看到上一条字幕。
+    func testRefinerReceivesPreviousCaptionAsContext() async throws {
+        let received = PreviousBox()
+        let pipeline = CaptionPipeline(
+            audioSource: FakeAudioSource(chunks: [[1, 1, 1, 1], [2, 2, 2, 2]]),
+            asr: FakeASR { samples in samples[0] == 1 ? "the strategies of battle" : "or their execution" },
+            translator: FakeTranslator { $0 },
+            refiner: FakeRefiner { english, _, previous in
+                received.values[english] = previous
+                return english
+            },
+            minChunkDuration: 1,
+            sampleRate: 4
+        )
+
+        await pipeline.start()
+        await pipeline.pumpTask?.value
+        for task in pipeline.refineTasks.values { await task.value }
+
+        XCTAssertEqual(received.values["the strategies of battle"], .some(nil), "the first caption has no context")
+        XCTAssertEqual(received.values["or their execution"], "the strategies of battle")
     }
 
     func testStuckRefinerDoesNotBlockLaterSpeech() async throws {
@@ -483,17 +507,21 @@ private struct FakeTranslator: Translator {
 }
 
 extension FakeTranslator: CaptionRefiner {
-    func refine(english: String, localDraft: String?) async throws -> String {
+    func refine(english: String, localDraft: String?, previousEnglish: String?) async throws -> String {
         try await handler(english)
     }
 }
 
 private struct FakeRefiner: CaptionRefiner {
-    let handler: @Sendable (String, String?) async throws -> String
+    let handler: @Sendable (String, String?, String?) async throws -> String
 
-    func refine(english: String, localDraft: String?) async throws -> String {
-        try await handler(english, localDraft)
+    func refine(english: String, localDraft: String?, previousEnglish: String?) async throws -> String {
+        try await handler(english, localDraft, previousEnglish)
     }
+}
+
+private final class PreviousBox: @unchecked Sendable {
+    var values: [String: String?] = [:]
 }
 
 @MainActor

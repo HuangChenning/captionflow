@@ -28,7 +28,7 @@ final class LLMTranslatorTests: XCTestCase {
     /// 用户确认的术语必须进入精修请求，否则词库对字幕没有任何作用。
     func testRefinementRequestIncludesSourceDraftAndApprovedGlossary() async throws {
         let body = try await capturedRequestBody(glossary: [GlossaryEntry(source: "minutes", target: "会议纪要")]) {
-            try await $0.refine(english: "Please send the Minutes", localDraft: "请发送分钟")
+            try await $0.refine(english: "Please send the Minutes", localDraft: "请发送分钟", previousEnglish: nil)
         }
 
         XCTAssertTrue(body.contains("Please send the Minutes"))
@@ -39,7 +39,7 @@ final class LLMTranslatorTests: XCTestCase {
     /// 只附带原文里出现的术语：其余词条对这一句没有用，还会增加请求长度。
     func testRefinementOmitsGlossaryTermsNotInSource() async throws {
         let body = try await capturedRequestBody(glossary: [GlossaryEntry(source: "minutes", target: "会议纪要")]) {
-            try await $0.refine(english: "hello", localDraft: nil)
+            try await $0.refine(english: "hello", localDraft: nil, previousEnglish: nil)
         }
 
         XCTAssertFalse(body.contains("会议纪要"))
@@ -55,10 +55,37 @@ final class LLMTranslatorTests: XCTestCase {
         XCTAssertTrue(body.contains("minutes=会议纪要"))
     }
 
+    /// 上一条字幕只作上下文，要明确告诉模型不要把它也翻出来，否则字幕会重复上一句。
+    func testRefinementIncludesPreviousCaptionAsContextOnly() async throws {
+        let body = try await capturedRequestBody(glossary: []) {
+            try await $0.refine(english: "or their execution", localDraft: nil, previousEnglish: "the strategies of battle")
+        }
+
+        XCTAssertTrue(body.contains("the strategies of battle"))
+        XCTAssertTrue(body.contains("do not translate it"))
+    }
+
+    /// 识别结果常有听错的词，模型若逐字翻译，"difference" 会译成“不同”而不是“尊重”。
+    func testRefinementWarnsThatSourceMayBeMisheard() async throws {
+        let body = try await capturedRequestBody(glossary: []) {
+            try await $0.refine(english: "give me difference", localDraft: nil, previousEnglish: nil)
+        }
+
+        XCTAssertTrue(body.contains("misheard"))
+    }
+
+    func testRefinementWithoutPreviousCaptionHasNoContextSection() async throws {
+        let body = try await capturedRequestBody(glossary: []) {
+            try await $0.refine(english: "hello", localDraft: nil, previousEnglish: nil)
+        }
+
+        XCTAssertFalse(body.contains("Previous subtitle"))
+    }
+
     /// 默认开启思考的模型会把 max_tokens 用在思考上、不返回译文（2026-09-26 验收中 10 句失败 5 句），所以请求要关闭思考。
     func testAnthropicRequestDisablesThinking() async throws {
         let body = try await capturedRequestBody(glossary: []) {
-            try await $0.refine(english: "hello", localDraft: nil)
+            try await $0.refine(english: "hello", localDraft: nil, previousEnglish: nil)
         }
 
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(body.utf8)) as? [String: Any])

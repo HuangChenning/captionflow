@@ -146,6 +146,7 @@ final class CaptionPipeline: ObservableObject {
         }
         guard !english.isEmpty, !isNonSpeechTranscript(english) else { return }
 
+        let previousEnglish = captions.last?.english
         let caption = Caption(id: UUID(), english: english, chinese: nil, isProvisional: true, createdAt: .now)
         captions.append(caption)
 
@@ -173,7 +174,7 @@ final class CaptionPipeline: ObservableObject {
         refineTasks[caption.id] = Task { [weak self] in
             let result: Result<String, Error>
             do {
-                result = .success(try await refiner.refine(english: english, localDraft: draft))
+                result = .success(try await refiner.refine(english: english, localDraft: draft, previousEnglish: previousEnglish))
             } catch {
                 result = .failure(error)
             }
