@@ -118,8 +118,12 @@ private struct TextAppearanceSettingsPane: View {
                     }
                 }
                 Toggle("显示英文原文", isOn: $showsOriginal)
-                Stepper("显示最近 \(visibleCaptionCount) 条字幕", value: $visibleCaptionCount,
-                        in: CaptionOverlaySettings.visibleCaptionCountRange)
+                LabeledContent("显示最近字幕条数") {
+                    Text("\(visibleCaptionCount) 条").monospacedDigit()
+                    Stepper("显示最近字幕条数", value: $visibleCaptionCount,
+                            in: CaptionOverlaySettings.visibleCaptionCountRange)
+                        .labelsHidden()
+                }
             } header: {
                 Text("悬浮字幕")
             } footer: {
