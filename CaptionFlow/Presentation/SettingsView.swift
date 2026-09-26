@@ -281,11 +281,23 @@ private struct TranslationSettingsPane: View {
     @ObservedObject var holder: TranslationSessionHolder
     @AppStorage("translation.targetLanguage") private var targetLanguageRaw = TargetLanguage.simplifiedChinese.rawValue
     @AppStorage("translation.engineMode") private var engineModeRaw = TranslationEngineMode.auto.rawValue
+    @AppStorage(SpeechRecognitionEngine.key) private var speechEngineRaw = SpeechRecognitionEngine.whisper.rawValue
     /// 非 nil 时 translationTask 提供会话并下载资源。
     @State private var downloadConfiguration: TranslationSession.Configuration?
 
     var body: some View {
         Form {
+            Section {
+                Picker("识别引擎", selection: $speechEngineRaw) {
+                    ForEach(SpeechRecognitionEngine.allCases) { engine in
+                        Text(engine.displayName).tag(engine.rawValue)
+                    }
+                }
+            } header: {
+                Text("语音识别")
+            } footer: {
+                Text("苹果系统识别使用系统管理的识别模型，第一次使用时由系统下载英文资源；系统低于 macOS 26 时自动改用 Whisper。修改在下次开始字幕时生效。")
+            }
             Section {
                 Picker("目标语言", selection: $targetLanguageRaw) {
                     ForEach(TargetLanguage.allCases) { language in

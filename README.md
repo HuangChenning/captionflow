@@ -14,7 +14,7 @@ CaptionFlow is a macOS app that shows live translated captions for English audio
 | Menu bar | Start/stop, audio source, target language, and settings from one menu bar icon |
 | Caption window | Floating, draggable, resizable window that stays on top; font size, color, and background opacity are adjustable, and it can show the last 1–5 captions |
 | Shortcuts | Customizable global shortcuts; defaults are ⌃⌥S start/stop, ⌃⌥H show/hide the caption window, ⌃⌥M move it to the next screen, ⌃⌥A switch audio source |
-| Speech recognition | WhisperKit `base.en`, English only, runs locally |
+| Speech recognition | WhisperKit `base.en` (default) or Apple on-device speech recognition on macOS 26, English only, runs locally |
 | Translation | Your LLM (Anthropic or OpenAI-compatible), with Apple Translation shown first; or local-only / LLM-only modes |
 | Target languages | Simplified Chinese, Traditional Chinese, Japanese, Korean, Spanish, French, German, Russian, Portuguese, Arabic |
 | Models | Multiple saved model profiles; add, edit, delete, and test each one |
@@ -25,7 +25,7 @@ CaptionFlow is a macOS app that shows live translated captions for English audio
 <img src="assets/readme/how-it-works.svg" width="100%" alt="Four stages: capture microphone or system audio, recognize English with WhisperKit on the Mac, translate with an LLM API or Apple Translation as a fallback, and display bilingual live captions in a floating window.">
 
 1. **Capture**: listen to the microphone, to everything your Mac plays (System Audio), or to a single app. Audio is never written to disk.
-2. **Recognize**: [WhisperKit](https://github.com/argmaxinc/WhisperKit) turns English speech into text on your Mac.
+2. **Recognize**: [WhisperKit](https://github.com/argmaxinc/WhisperKit) turns English speech into text on your Mac. On macOS 26 you can switch to Apple's built-in speech recognition in **Settings → 翻译设置** (Translation); the system downloads and manages its model.
 3. **Translate**: the English text is sent to your LLM endpoint (Anthropic Messages or OpenAI-compatible API). Apple's on-device Translation shows a line first, and the LLM result replaces it when it arrives; if the LLM fails, the local line stays.
 4. **Display**: a floating caption window shows the latest English line with its translation above other apps, and keeps revising it as more context comes in.
 
