@@ -189,6 +189,18 @@ final class TermCandidateTests: XCTestCase {
         XCTAssertNil(loaded.first?.occurrences)
     }
 
+    /// 手动添加的词先成为待确认候选，不进词库。译文可以先空着；和已有术语重复时不添加。
+    func testUserAddedTermStaysPendingAndRejectsDuplicates() {
+        let added = TermCandidate.addedByUser(source: " Kubernetes ", target: "  ", existingSources: ["minutes"])
+
+        XCTAssertEqual(added?.source, "Kubernetes")
+        XCTAssertEqual(added?.target, "")
+        XCTAssertEqual(added?.isManual, true)
+        XCTAssertNil(added?.occurrences)
+        XCTAssertNil(TermCandidate.addedByUser(source: "  ", target: "容器", existingSources: []))
+        XCTAssertNil(TermCandidate.addedByUser(source: "minutes", target: "会议纪要", existingSources: ["Minutes"]))
+    }
+
     /// 只有首字母大写且含小写字母的词条才是专有名词。普通术语和全大写缩写不能被当成听错的名字。
     func testProperNounDetectionIgnoresOrdinaryTermsAndAcronyms() {
         XCTAssertTrue(GlossaryEntry(source: "Lucas Rest", target: "卢卡斯").isProperNoun)

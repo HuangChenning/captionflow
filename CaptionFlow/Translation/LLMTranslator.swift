@@ -101,6 +101,37 @@ struct LLMTranslator: Translator, CaptionRefiner {
         return terms.map { GlossaryEntry(source: $0.source, target: $0.target) }
     }
 
+    /// 优化一条尚未采纳的候选：改正可能听错的英文，并给出更稳妥的译文。只返回建议，不写入词库。
+    func optimizeTerm(source: String, target: String, example: String) async throws -> GlossaryEntry {
+        var prompt = """
+        Improve this glossary entry so future subtitles use one consistent translation.
+        The English may come from speech recognition and can be misheard. If the example shows what was actually said, correct the English spelling. Otherwise keep the English term.
+        Reply with only a JSON object like {"source": "English term", "target": "translation"}.
+
+        English term:
+        \(source)
+        """
+        let trimmedTarget = target.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedTarget.isEmpty {
+            prompt += "\n\nCurrent translation:\n\(trimmedTarget)"
+        }
+        let trimmedExample = example.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedExample.isEmpty {
+            prompt += "\n\nExample sentence:\n\(trimmedExample)"
+        }
+        let reply = try await send(prompt)
+        guard let start = reply.firstIndex(of: "{"), let end = reply.lastIndex(of: "}"), start < end,
+              let term = try? JSONDecoder().decode(ProposedTerm.self, from: Data(reply[start...end].utf8)) else {
+            throw LLMTranslatorError.malformedTermList
+        }
+        let improvedSource = term.source.trimmingCharacters(in: .whitespacesAndNewlines)
+        let improvedTarget = term.target.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !improvedSource.isEmpty, !improvedTarget.isEmpty else {
+            throw LLMTranslatorError.malformedTermList
+        }
+        return GlossaryEntry(source: improvedSource, target: improvedTarget)
+    }
+
     /// 精修时最多附带这么多条“可能出现的名字”。只挑原文里没有原样出现的专有名词，避免每个请求都带上整个词库。
     static let maxPossibleNames = 20
 
