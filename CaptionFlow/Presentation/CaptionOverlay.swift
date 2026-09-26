@@ -24,7 +24,7 @@ enum CaptionOverlaySettings {
 }
 
 enum CaptionTextColor: String, CaseIterable, Identifiable {
-    case white, yellow, cyan
+    case white, yellow, cyan, black
 
     var id: String { rawValue }
 
@@ -33,6 +33,7 @@ enum CaptionTextColor: String, CaseIterable, Identifiable {
         case .white: return "白色"
         case .yellow: return "黄色"
         case .cyan: return "青色"
+        case .black: return "黑色"
         }
     }
 
@@ -41,6 +42,7 @@ enum CaptionTextColor: String, CaseIterable, Identifiable {
         case .white: return .white
         case .yellow: return Color(red: 1.0, green: 0.86, blue: 0.3)
         case .cyan: return Color(red: 0.45, green: 0.9, blue: 1.0)
+        case .black: return .black
         }
     }
 }
