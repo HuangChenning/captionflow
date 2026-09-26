@@ -64,7 +64,10 @@ final class CaptionOverlayWindowController {
         panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.minSize = NSSize(width: 320, height: 80)
-        panel.contentView = NSHostingView(rootView: rootView)
+        let hostingView = NSHostingView(rootView: rootView)
+        // 窗口大小由用户拖动决定，不随字幕内容变化；否则内容高于窗口时约束会反复更新，AppKit 抛出异常导致崩溃。
+        hostingView.sizingOptions = []
+        panel.contentView = hostingView
 
         if !panel.setFrameUsingName("CaptionOverlay") {
             place(on: NSScreen.main)
