@@ -328,23 +328,40 @@ final class CaptionPipelineTests: XCTestCase {
         XCTAssertEqual(pipeline.captions.map(\.english), ["hello"])
     }
 
-    // 固定时长硬切会把 "GitHub" 切成 "Git" 和 "Hub"，后半段常被丢掉；应切在停顿处，停顿后的语音留给下一个窗口。
-    func testWindowIsCutAtThePause() async throws {
-        let audio = speech(70) + silence(10) + speech(30)
+    // 固定时长硬切会把 "GitHub" 切成 "Git" 和 "Hub"，后半段常被丢掉；应切在句间的长停顿处，停顿后的语音留给下一个窗口。
+    func testWindowIsCutAtALongPause() async throws {
+        let audio = speech(70) + silence(60) + speech(30)
 
         let transcribed = await transcribedWindows(of: [audio])
 
-        XCTAssertEqual(transcribed, [Array(audio[..<75])], "cut in the middle of the 70..<80 pause")
+        XCTAssertEqual(transcribed, [Array(audio[..<95])], "cut in the middle of the first 0.5 s of the pause")
     }
 
-    // 连续语音里能量最低处常在词中间（"pull request" 曾被切成 "pool re" 和 "quest"），
-    // 所以过了最短长度也要等到真正的停顿再切。
-    func testContinuousSpeechWaitsForAPauseBeforeCutting() async throws {
-        let audio = speech(150) + silence(10) + speech(20)
+    // 词间短停顿处切会把 "Microsoft Build" 切开（"built in Seattle" 译成“在西雅图制造”），所以要跳过短停顿、等句间长停顿。
+    func testShortPauseBetweenWordsIsSkippedForALongPause() async throws {
+        let audio = speech(80) + silence(20) + speech(40) + silence(60) + speech(10)
 
         let transcribed = await transcribedWindows(of: [audio])
 
-        XCTAssertEqual(transcribed.map(\.count), [155])
+        XCTAssertEqual(transcribed.map(\.count), [165])
+    }
+
+    // 到最长长度仍没有长停顿时，退而切在最长的停顿处，而不是在词中间硬切。
+    func testWithoutALongPauseTheLongestPauseIsUsedAtTheMaximumLength() async throws {
+        let audio = speech(70) + silence(10) + speech(40) + silence(30) + speech(60)
+
+        let transcribed = await transcribedWindows(of: [audio])
+
+        XCTAssertEqual(transcribed.map(\.count), [135])
+    }
+
+    // 句间停顿后的静音若算进下一个窗口，下一句还没说完窗口就到了最长长度，只能在词间切开。
+    func testLeadingSilenceDoesNotCountTowardTheWindowLength() async throws {
+        let audio = silence(150) + speech(180) + silence(60)
+
+        let transcribed = await transcribedWindows(of: [audio])
+
+        XCTAssertEqual(transcribed, [speech(180) + silence(25)])
     }
 
     // 一直没有停顿时不能无限等下去，否则字幕会停住；达到最长长度就硬切。
@@ -362,7 +379,7 @@ final class CaptionPipelineTests: XCTestCase {
         [Float](repeating: 0, count: count)
     }
 
-    /// 100 Hz 采样：最短 1 秒（100 个采样），从第 50 个采样起找停顿，最长 2 秒（200 个采样）。
+    /// 100 Hz 采样：最短 1 秒（100 个采样），长停顿 0.5 秒（50 个采样），最长 2 秒（200 个采样）。
     private func transcribedWindows(of chunks: [[Float]]) async -> [[Float]] {
         var transcribed: [[Float]] = []
         let pipeline = CaptionPipeline(
@@ -374,7 +391,6 @@ final class CaptionPipelineTests: XCTestCase {
             translator: FakeTranslator { _ in "你好" },
             minChunkDuration: 1,
             sampleRate: 100,
-            cutSearchDuration: 0.5,
             maxChunkDuration: 2
         )
         await pipeline.start()

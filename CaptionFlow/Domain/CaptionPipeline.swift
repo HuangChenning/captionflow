@@ -19,10 +19,11 @@ final class CaptionPipeline: ObservableObject {
     private let minChunkSamples: Int
     /// 窗口 RMS 低于此值视为静音，不送识别。Whisper 在静音上常输出 "you" 之类的幻觉文本。
     private let silenceRMSThreshold: Float
-    /// 窗口满 minChunkSamples 后，从它之前这段开始找停顿，在停顿处切开，避免把单词切成两半。
-    private let cutSearchSamples: Int
-    /// 一直没有停顿时，窗口达到这个长度才硬切。
+    /// 窗口满 minChunkSamples 后在停顿处切开，避免把单词切成两半。
+    /// 一直没有长停顿时，窗口达到这个长度才退而在最长的停顿处切，没有停顿就硬切。
     private let maxChunkSamples: Int
+    /// 达到这个长度的停顿视为句间停顿，优先在这里切。
+    private let longPauseSamples: Int
     private let cutFrameSamples: Int
 
     private(set) var pumpTask: Task<Void, Never>?
@@ -36,8 +37,8 @@ final class CaptionPipeline: ObservableObject {
         minChunkDuration: TimeInterval = 3,
         sampleRate: Double = 16_000,
         silenceRMSThreshold: Float = 0.005,
-        cutSearchDuration: TimeInterval = 1,
-        maxChunkDuration: TimeInterval = 6
+        maxChunkDuration: TimeInterval = 6,
+        longPauseDuration: TimeInterval = 0.5
     ) {
         self.audioSource = audioSource
         self.asr = asr
@@ -45,9 +46,9 @@ final class CaptionPipeline: ObservableObject {
         self.refiner = refiner
         self.minChunkSamples = Int(minChunkDuration * sampleRate)
         self.silenceRMSThreshold = silenceRMSThreshold
-        self.cutSearchSamples = Int(cutSearchDuration * sampleRate)
         self.cutFrameSamples = Int(0.1 * sampleRate)
         self.maxChunkSamples = Int(maxChunkDuration * sampleRate)
+        self.longPauseSamples = Int(longPauseDuration * sampleRate)
     }
 
     /// 会话中途更换翻译方式（例如本地资源下载完成后），只影响之后的语音。
@@ -85,35 +86,53 @@ final class CaptionPipeline: ObservableObject {
         for await chunk in stream {
             if Task.isCancelled { return }
             buffer.append(contentsOf: chunk)
-            guard buffer.count >= minChunkSamples else { continue }
-            guard let cut = cutIndex(in: buffer) else { continue }
-            let samples = Array(buffer[..<cut])
-            buffer.removeFirst(cut)
-            await transcribeAndTranslate(samples)
+            dropLeadingSilence(&buffer)
+            while buffer.count >= minChunkSamples, let cut = cutIndex(in: buffer) {
+                let samples = Array(buffer[..<cut])
+                buffer.removeFirst(cut)
+                dropLeadingSilence(&buffer)
+                await transcribeAndTranslate(samples)
+            }
         }
     }
 
+    /// 窗口开头的静音不送识别，也不算进窗口长度；否则句间停顿会把下一句的窗口提前撑到最长长度，只能在词间切开。
+    private func dropLeadingSilence(_ buffer: inout [Float]) {
+        let frame = cutFrameSamples
+        guard frame > 0 else { return }
+        var end = 0
+        while end + frame <= buffer.count, rms(Array(buffer[end..<(end + frame)])) < silenceRMSThreshold {
+            end += frame
+        }
+        buffer.removeFirst(end)
+    }
+
     /// 固定每 3 秒切一刀会把 "GitHub" 切成 "Git" 和 "Hub"，后半段常识别不出来；
-    /// 只挑能量最低的位置切也不行，连续语音里能量最低处常在词中间（"pull request" 被切成 "pool re" 和 "quest"）。
-    /// 所以只在真正的停顿处切：返回停顿中点；还没有停顿时返回 nil 继续收音频，达到 maxChunkSamples 才硬切。
+    /// 只挑能量最低的位置切也不行，连续语音里能量最低处常在词中间（"pull request" 被切成 "pool re" 和 "quest"）；
+    /// 词间的短停顿也不理想（"Microsoft Build" 被切开后 "built in Seattle" 译成“在西雅图制造”）。
+    /// 所以优先在长停顿（句间）中点切；还没有长停顿时返回 nil 继续收音频；
+    /// 达到 maxChunkSamples 仍没有长停顿，就在最长的停顿处切，一个停顿都没有才硬切。
     private func cutIndex(in buffer: [Float]) -> Int? {
         let frame = cutFrameSamples
         guard frame > 0 else { return buffer.count }
         // 帧 RMS 远低于整段语音的平均水平（或本身就是静音）才算停顿。
         let pauseRMS = max(silenceRMSThreshold, 0.1 * rms(buffer))
-        var best: Int?
-        var bestRMS = pauseRMS
-        var start = max(frame, minChunkSamples - cutSearchSamples)
+        var longest: Range<Int>?
+        var runStart: Int?
+        var start = frame
         while start + frame <= buffer.count {
-            let frameRMS = rms(Array(buffer[start..<(start + frame)]))
-            if frameRMS < bestRMS {
-                bestRMS = frameRMS
-                best = start + frame / 2
+            if rms(Array(buffer[start..<(start + frame)])) < pauseRMS {
+                let run = (runStart ?? start)..<(start + frame)
+                runStart = run.lowerBound
+                if run.count >= longPauseSamples { return (run.lowerBound + run.upperBound) / 2 }
+                if run.count > (longest?.count ?? 0) { longest = run }
+            } else {
+                runStart = nil
             }
             start += max(1, frame / 2)
         }
-        if let best { return best }
-        return buffer.count >= maxChunkSamples ? buffer.count : nil
+        guard buffer.count >= maxChunkSamples else { return nil }
+        return longest.map { ($0.lowerBound + $0.upperBound) / 2 } ?? buffer.count
     }
 
     private func transcribeAndTranslate(_ samples: [Float]) async {
