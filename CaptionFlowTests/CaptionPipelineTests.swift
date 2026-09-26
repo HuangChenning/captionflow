@@ -328,31 +328,58 @@ final class CaptionPipelineTests: XCTestCase {
         XCTAssertEqual(pipeline.captions.map(\.english), ["hello"])
     }
 
-    // 固定时长硬切会把 "GitHub" 切成 "Git" 和 "Hub"，后半段常被丢掉；应切在停顿处，停顿后的语音完整留给下一个窗口。
-    func testWindowIsCutAtThePauseSoTheNextWordStaysWhole() async throws {
-        let speech: (Int) -> [Float] = { count in (0..<count).map { $0.isMultiple(of: 2) ? 0.1 : -0.1 } }
-        let first = speech(70) + [Float](repeating: 0, count: 10) + speech(30)
-        let audioSource = FakeAudioSource(chunks: [first, speech(70)])
+    // 固定时长硬切会把 "GitHub" 切成 "Git" 和 "Hub"，后半段常被丢掉；应切在停顿处，停顿后的语音留给下一个窗口。
+    func testWindowIsCutAtThePause() async throws {
+        let audio = speech(70) + silence(10) + speech(30)
+
+        let transcribed = await transcribedWindows(of: [audio])
+
+        XCTAssertEqual(transcribed, [Array(audio[..<75])], "cut in the middle of the 70..<80 pause")
+    }
+
+    // 连续语音里能量最低处常在词中间（"pull request" 曾被切成 "pool re" 和 "quest"），
+    // 所以过了最短长度也要等到真正的停顿再切。
+    func testContinuousSpeechWaitsForAPauseBeforeCutting() async throws {
+        let audio = speech(150) + silence(10) + speech(20)
+
+        let transcribed = await transcribedWindows(of: [audio])
+
+        XCTAssertEqual(transcribed.map(\.count), [155])
+    }
+
+    // 一直没有停顿时不能无限等下去，否则字幕会停住；达到最长长度就硬切。
+    func testSpeechWithoutPauseIsCutAtTheMaximumLength() async throws {
+        let transcribed = await transcribedWindows(of: Array(repeating: speech(50), count: 5))
+
+        XCTAssertEqual(transcribed.map(\.count), [200])
+    }
+
+    private func speech(_ count: Int) -> [Float] {
+        (0..<count).map { $0.isMultiple(of: 2) ? 0.1 : -0.1 }
+    }
+
+    private func silence(_ count: Int) -> [Float] {
+        [Float](repeating: 0, count: count)
+    }
+
+    /// 100 Hz 采样：最短 1 秒（100 个采样），从第 50 个采样起找停顿，最长 2 秒（200 个采样）。
+    private func transcribedWindows(of chunks: [[Float]]) async -> [[Float]] {
         var transcribed: [[Float]] = []
-        let asr = FakeASR { samples in
-            transcribed.append(samples)
-            return "hello"
-        }
         let pipeline = CaptionPipeline(
-            audioSource: audioSource,
-            asr: asr,
+            audioSource: FakeAudioSource(chunks: chunks),
+            asr: FakeASR { samples in
+                transcribed.append(samples)
+                return "hello"
+            },
             translator: FakeTranslator { _ in "你好" },
             minChunkDuration: 1,
             sampleRate: 100,
-            cutSearchDuration: 0.5
+            cutSearchDuration: 0.5,
+            maxChunkDuration: 2
         )
-
         await pipeline.start()
         await pipeline.pumpTask?.value
-
-        XCTAssertEqual(transcribed.first?.count, 75, "cut in the middle of the 70..<80 pause")
-        XCTAssertEqual(transcribed.count, 2)
-        XCTAssertEqual(Array(transcribed[1].prefix(35)), Array(first[75...]), "speech after the pause must start the next window intact")
+        return transcribed
     }
 
     func testTranscriptionErrorTransitionsToFailedAndStopsAudioSource() async throws {
