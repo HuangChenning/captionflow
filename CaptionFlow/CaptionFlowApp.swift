@@ -7,6 +7,7 @@ struct CaptionFlowApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     // 由 App 持有，全局快捷键、菜单栏菜单和悬浮字幕窗共用同一个会话。
     @StateObject private var sessionController: CaptionSessionController
+    private let translationSessionHolder: TranslationSessionHolder
     private let updaterController = SPUStandardUpdaterController(
         startingUpdater: true,
         updaterDelegate: nil,
@@ -15,6 +16,7 @@ struct CaptionFlowApp: App {
 
     init() {
         let holder = TranslationSessionHolder()
+        translationSessionHolder = holder
         _sessionController = StateObject(wrappedValue: CaptionSessionController(translationSessionHolder: holder))
     }
 
@@ -25,7 +27,7 @@ struct CaptionFlowApp: App {
             Image(systemName: sessionController.pipeline == nil ? "captions.bubble" : "captions.bubble.fill")
         }
         Settings {
-            SettingsView(updater: updaterController.updater)
+            SettingsView(updater: updaterController.updater, translationSessionHolder: translationSessionHolder)
         }
         .windowResizability(.contentSize)
         .commands {

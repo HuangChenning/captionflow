@@ -3,7 +3,7 @@ import Sparkle
 import SwiftUI
 
 private enum SettingsSection: String, CaseIterable, Identifiable {
-    case launch, textAppearance, display, translation, models, shortcuts, vocabulary, updates, about
+    case launch, textAppearance, display, translation, models, history, shortcuts, vocabulary, updates, about
 
     var id: String { rawValue }
 
@@ -14,6 +14,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         case .display: return "显示设置"
         case .translation: return "翻译设置"
         case .models: return "模型"
+        case .history: return "字幕历史"
         case .shortcuts: return "键盘快捷键"
         case .vocabulary: return "自定义词汇"
         case .updates: return "软件更新"
@@ -28,6 +29,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         case .display: return "rectangle.on.rectangle"
         case .translation: return "character.bubble"
         case .models: return "cpu"
+        case .history: return "clock.arrow.circlepath"
         case .shortcuts: return "keyboard"
         case .vocabulary: return "textformat.abc"
         case .updates: return "arrow.triangle.2.circlepath"
@@ -38,6 +40,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
 struct SettingsView: View {
     let updater: SPUUpdater
+    let translationSessionHolder: TranslationSessionHolder
 
     @State private var selection: SettingsSection? = .translation
 
@@ -49,10 +52,14 @@ struct SettingsView: View {
             .navigationSplitViewColumnWidth(min: 150, ideal: 170)
         } detail: {
             switch selection ?? .translation {
+            case .launch:
+                LaunchAtLoginSettingsPane()
             case .translation:
-                TranslationSettingsPane()
+                TranslationSettingsPane(holder: translationSessionHolder)
             case .models:
                 ModelSettingsPane()
+            case .history:
+                HistoryView()
             case .updates:
                 UpdateSettingsPane(updater: updater)
             case .textAppearance:
@@ -61,6 +68,8 @@ struct SettingsView: View {
                 DisplaySettingsPane()
             case .shortcuts:
                 ShortcutSettingsPane()
+            case .vocabulary:
+                VocabularySettingsPane()
             case let other:
                 PlaceholderSettingsPane(title: other.title)
             }
@@ -261,6 +270,7 @@ private struct ShortcutSettingsPane: View {
 }
 
 private struct TranslationSettingsPane: View {
+    @ObservedObject var holder: TranslationSessionHolder
     @AppStorage("translation.targetLanguage") private var targetLanguageRaw = TargetLanguage.simplifiedChinese.rawValue
     @AppStorage("translation.engineMode") private var engineModeRaw = TranslationEngineMode.auto.rawValue
 
@@ -282,9 +292,29 @@ private struct TranslationSettingsPane: View {
             } footer: {
                 Text("决定翻译目标语言、优先使用本地翻译还是 LLM；具体模型与 API Key 在“模型”中配置。")
             }
+            Section("本地翻译资源") {
+                Text(resourceMessage)
+                if case .downloadable = holder.readiness.state {
+                    Button("下载英语到简体中文资源") { Task { await holder.prepareTranslation() } }
+                }
+                if case .failed = holder.readiness.state {
+                    Button("重新检查") { Task { await holder.readiness.refresh() } }
+                }
+            }
         }
+        .onAppear { Task { await holder.readiness.refresh() } }
         .formStyle(.grouped)
         .navigationTitle("翻译设置")
+    }
+
+    private var resourceMessage: String {
+        switch holder.readiness.state {
+        case .checking: return "正在检查…"
+        case .installed: return "英语到简体中文本地资源已安装。"
+        case .downloadable: return "资源可下载；下载后可离线进行本地翻译。"
+        case .unsupported: return "此设备不支持该本地翻译语言组合。"
+        case .failed(let reason): return "资源检查或下载失败：\(reason)"
+        }
     }
 }
 

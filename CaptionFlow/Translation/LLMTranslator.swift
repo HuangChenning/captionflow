@@ -54,6 +54,20 @@ struct LLMTranslator: Translator {
         }
     }
 
+    func refine(english: String, localDraft: String, glossary: [GlossaryEntry]) async throws -> String {
+        let terms = glossary.map { "\($0.source)=\($0.target)" }.joined(separator: "\n")
+        return try await translate("""
+        English source:
+        \(english)
+
+        Local Chinese draft:
+        \(localDraft)
+
+        Approved glossary:
+        \(terms)
+        """)
+    }
+
     private var systemInstruction: String {
         "\(configuration.instruction)\n\nTarget language: \(targetLanguageName)."
     }
