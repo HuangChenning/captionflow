@@ -29,6 +29,7 @@ final class CaptionPipelineTests: XCTestCase {
         XCTAssertEqual(pipeline.captions[0].english, "hello")
         XCTAssertEqual(pipeline.captions[0].chinese, "你好")
         XCTAssertFalse(pipeline.captions[0].isProvisional)
+        XCTAssertNil(pipeline.captions[0].refinement, "without a refiner the overlay must not claim an LLM refinement")
     }
 
     /// 没有可用翻译时仍要显示英文字幕，而不是停止或一直等待译文。
@@ -69,12 +70,14 @@ final class CaptionPipelineTests: XCTestCase {
 
         XCTAssertEqual(pipeline.captions[0].chinese, "本地译文", "the local translation must appear without waiting for the LLM")
         XCTAssertTrue(pipeline.captions[0].isProvisional)
+        XCTAssertEqual(pipeline.captions[0].refinement, .refining, "the user must be able to tell the shown text is a local draft")
 
         gate.open()
         for task in pipeline.refineTasks.values { await task.value }
 
         XCTAssertEqual(pipeline.captions[0].chinese, "LLM 译文", "the LLM result must replace the local draft")
         XCTAssertFalse(pipeline.captions[0].isProvisional)
+        XCTAssertEqual(pipeline.captions[0].refinement, .refined)
     }
 
     /// 精修要拿到本地初译，才能纠正它而不是从头重新翻译。
@@ -138,6 +141,7 @@ final class CaptionPipelineTests: XCTestCase {
         XCTAssertEqual(pipeline.state, .running, "an LLM failure must not stop captions when a local translation exists")
         XCTAssertEqual(pipeline.captions[0].chinese, "本地译文")
         XCTAssertFalse(pipeline.captions[0].isProvisional)
+        XCTAssertEqual(pipeline.captions[0].refinement, .failed, "a kept local draft must not look like a refined result")
     }
 
     /// 会话中翻译出错时保留英文字幕继续运行：翻译不可用不应让用户连英文也看不到。

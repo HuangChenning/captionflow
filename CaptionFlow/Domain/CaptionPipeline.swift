@@ -103,9 +103,10 @@ final class CaptionPipeline: ObservableObject {
             }
             return
         }
+        setRefinement(id: caption.id, .refining)
         let draft = try? await translator.translate(english)
         if let draft {
-            updateCaption(id: caption.id, chinese: draft, isProvisional: true)
+            updateCaption(id: caption.id, chinese: draft, isProvisional: true, refinement: .refining)
         }
         // 在后台等待 refiner，慢或卡住的请求不会挡住后面的语音。
         refineTasks[caption.id] = Task { [weak self] in
@@ -125,13 +126,14 @@ final class CaptionPipeline: ObservableObject {
         switch result {
         case .success(let chinese):
             translationError = nil
-            updateCaption(id: id, chinese: chinese, isProvisional: false)
+            updateCaption(id: id, chinese: chinese, isProvisional: false, refinement: .refined)
         case .failure(let error):
             // 保留临时译文；两种翻译都没有结果时只保留英文，会话继续。
             if let draft = captions.first(where: { $0.id == id })?.chinese {
-                updateCaption(id: id, chinese: draft, isProvisional: false)
+                updateCaption(id: id, chinese: draft, isProvisional: false, refinement: .failed)
             } else {
                 translationError = error.localizedDescription
+                setRefinement(id: id, .failed)
                 markEnglishOnly(id: id)
             }
         }
@@ -142,12 +144,17 @@ final class CaptionPipeline: ObservableObject {
         captions[index].isProvisional = false
     }
 
+    private func setRefinement(id: UUID, _ refinement: Caption.Refinement) {
+        guard let index = captions.firstIndex(where: { $0.id == id }) else { return }
+        captions[index].refinement = refinement
+    }
+
     private func cancelRefinements() {
         refineTasks.values.forEach { $0.cancel() }
         refineTasks.removeAll()
     }
 
-    private func updateCaption(id: UUID, chinese: String, isProvisional: Bool) {
+    private func updateCaption(id: UUID, chinese: String, isProvisional: Bool, refinement: Caption.Refinement? = nil) {
         guard let index = captions.firstIndex(where: { $0.id == id }) else { return }
         let existing = captions[index]
         captions[index] = Caption(
@@ -155,7 +162,8 @@ final class CaptionPipeline: ObservableObject {
             english: existing.english,
             chinese: chinese,
             isProvisional: isProvisional,
-            createdAt: existing.createdAt
+            createdAt: existing.createdAt,
+            refinement: refinement
         )
     }
 
