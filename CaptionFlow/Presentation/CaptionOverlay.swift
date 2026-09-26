@@ -152,7 +152,8 @@ private struct CaptionOverlayContent: View {
             // 窗口放不下时保留底部最新的字幕，较早的从顶部裁掉。
             VStack(spacing: 12) {
                 ForEach(recent) { caption in
-                    captionView(caption)
+                    // 较早的字幕按当前字幕的 65% 字号显示，并且颜色变淡。
+                    captionView(caption, scale: caption.id == latest.id ? 1 : 0.65)
                         .opacity(caption.id == latest.id ? 1 : 0.6)
                 }
             }
@@ -164,21 +165,21 @@ private struct CaptionOverlayContent: View {
         }
     }
 
-    private func captionView(_ caption: Caption) -> some View {
+    private func captionView(_ caption: Caption, scale: Double) -> some View {
         VStack(spacing: 6) {
             if showsOriginal {
                 Text(caption.english)
-                    .font(.system(size: originalFontSize))
+                    .font(.system(size: originalFontSize * scale))
                     .foregroundStyle(textColor.opacity(0.75))
             }
             // 译文未到时显示“…”；只显示英文时没有译文，不显示这一行。
             if caption.chinese != nil || caption.isProvisional {
                 Text(caption.chinese ?? "…")
-                    .font(.system(size: translationFontSize, weight: .semibold))
+                    .font(.system(size: translationFontSize * scale, weight: .semibold))
                     .foregroundStyle(textColor)
                 if let status = refinementStatus(caption) {
                     Text(status)
-                        .font(.system(size: 12))
+                        .font(.system(size: 12 * scale))
                         .foregroundStyle(textColor.opacity(0.5))
                 }
             } else if caption.id == pipeline.captions.last?.id, let translationError = pipeline.translationError {
