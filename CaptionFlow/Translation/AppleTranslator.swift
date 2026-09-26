@@ -5,6 +5,7 @@ import Translation
 @MainActor
 final class TranslationSessionHolder: ObservableObject {
     @Published var configuration: TranslationSession.Configuration?
+    let readiness = LocalTranslationReadiness()
     private var session: TranslationSession?
     private var waiters: [CheckedContinuation<TranslationSession, Never>] = []
 
@@ -17,6 +18,7 @@ final class TranslationSessionHolder: ObservableObject {
         self.session = session
         waiters.forEach { $0.resume(returning: session) }
         waiters.removeAll()
+        Task { await readiness.refresh() }
     }
 
     func updateTarget(_ language: Locale.Language) {
@@ -29,6 +31,10 @@ final class TranslationSessionHolder: ObservableObject {
     func session() async -> TranslationSession {
         if let session { return session }
         return await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func prepareTranslation() async {
+        await readiness.prepare(using: await session())
     }
 }
 

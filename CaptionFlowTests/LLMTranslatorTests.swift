@@ -25,6 +25,26 @@ final class LLMTranslatorTests: XCTestCase {
         XCTAssertEqual(result, "你好，你好吗？")
     }
 
+    func testRefinementRequestIncludesSourceDraftAndApprovedGlossary() async throws {
+        let responseJSON = Data(#"{"content":[{"type":"text","text":"会议纪要"}]}"#.utf8)
+        let translator = LLMTranslator(configuration: configuration, apiKey: "test-key") { request in
+            let body = String(decoding: request.httpBody!, as: UTF8.self)
+            XCTAssertTrue(body.contains("meeting notes"))
+            XCTAssertTrue(body.contains("会议记录"))
+            XCTAssertTrue(body.contains("minutes=会议纪要"))
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (responseJSON, response)
+        }
+
+        let result = try await translator.refine(
+            english: "meeting notes",
+            localDraft: "会议记录",
+            glossary: [GlossaryEntry(source: "minutes", target: "会议纪要")]
+        )
+
+        XCTAssertEqual(result, "会议纪要")
+    }
+
     func testTranslateParsesOpenAIChatCompletionsResponse() async throws {
         let openAIConfiguration = LLMConfiguration(
             baseURL: URL(string: "https://api.openai.com/v1")!,

@@ -1,13 +1,42 @@
 import Foundation
 
+struct LLMProfileFileStore {
+    let fileURL: URL
+
+    init(fileURL: URL = LLMProfileFileStore.defaultFileURL) {
+        self.fileURL = fileURL
+    }
+
+    func load() throws -> [LLMProfile] {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return [] }
+        return try JSONDecoder().decode([LLMProfile].self, from: Data(contentsOf: fileURL))
+    }
+
+    func save(_ profiles: [LLMProfile]) throws {
+        try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(profiles).write(to: fileURL, options: .atomic)
+    }
+
+    private static var defaultFileURL: URL {
+        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return root.appendingPathComponent("CaptionFlow/llm-profiles.json")
+    }
+}
+
 enum LLMProfileStore {
     private static let profilesKey = "llm.profiles"
     private static let selectedIDKey = "llm.selectedProfileID"
     private static let keychain = KeychainStore(service: "com.taihongteng.CaptionFlow")
+    private static let fileStore = LLMProfileFileStore()
 
     static func load() -> [LLMProfile] {
+        if let profiles = try? fileStore.load(), !profiles.isEmpty {
+            return profiles
+        }
         if let data = UserDefaults.standard.data(forKey: profilesKey),
            let profiles = try? JSONDecoder().decode([LLMProfile].self, from: data) {
+            save(profiles)
+            UserDefaults.standard.removeObject(forKey: profilesKey)
             return profiles
         }
         guard let migrated = migrateLegacyProfile() else { return [] }
@@ -15,8 +44,7 @@ enum LLMProfileStore {
     }
 
     static func save(_ profiles: [LLMProfile]) {
-        guard let data = try? JSONEncoder().encode(profiles) else { return }
-        UserDefaults.standard.set(data, forKey: profilesKey)
+        try? fileStore.save(profiles)
     }
 
     static var selectedID: UUID? {

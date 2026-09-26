@@ -15,4 +15,27 @@ final class KeychainStoreTests: XCTestCase {
         XCTAssertNil(LLMConfiguration(baseURL: URL(string: "ftp://example.com")!, model: "model", instruction: "translate"))
         XCTAssertNil(LLMConfiguration(baseURL: URL(string: "https://api.example.com")!, model: " ", instruction: "translate"))
     }
+
+    func testProfileFileStoreRoundTripsProfilesAsJSON() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appendingPathComponent("profiles.json")
+        let profile = LLMProfile(name: "MiniMax", apiStyle: .anthropic, baseURL: URL(string: "https://api.minimaxi.com/anthropic")!, model: "MiniMax-M3")
+
+        try LLMProfileFileStore(fileURL: fileURL).save([profile])
+
+        XCTAssertEqual(try LLMProfileFileStore(fileURL: fileURL).load(), [profile])
+        XCTAssertTrue(String(decoding: try Data(contentsOf: fileURL), as: UTF8.self).contains("MiniMax-M3"))
+    }
+
+    func testGlossaryStorePersistsConfirmedTerms() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = GlossaryStore(fileURL: directory.appendingPathComponent("glossary.json"))
+        let entry = GlossaryEntry(source: "minutes", target: "会议纪要")
+
+        try store.save([entry])
+
+        XCTAssertEqual(try store.load(), [entry])
+    }
 }

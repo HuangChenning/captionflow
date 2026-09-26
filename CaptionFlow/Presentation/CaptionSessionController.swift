@@ -18,6 +18,7 @@ final class CaptionSessionController: ObservableObject {
 
     private let translationSessionHolder: TranslationSessionHolder
     private let keychain = KeychainStore(service: "com.taihongteng.CaptionFlow")
+    private let sessionStore = SessionStore()
     // Apple 翻译的会话需要挂在窗口里的视图上；没有主窗口后挂在字幕窗上。
     private lazy var overlay = CaptionOverlayWindowController(
         rootView: CaptionOverlayView(session: self)
@@ -107,8 +108,13 @@ final class CaptionSessionController: ObservableObject {
 
     func stop() async {
         pipelineStateObservation = nil
+        let captions = pipeline?.captions ?? []
         await pipeline?.stop()
         pipeline = nil
+        if !captions.isEmpty {
+            do { _ = try sessionStore.save(captions: captions) }
+            catch { errorMessage = "无法保存字幕历史：\(error.localizedDescription)" }
+        }
         let hidesOnStop = UserDefaults.standard.object(forKey: CaptionOverlaySettings.hidesOnStopKey) as? Bool ?? true
         if hidesOnStop {
             overlay.hide()
