@@ -1,4 +1,7 @@
 import Foundation
+import os
+
+private let logger = Logger(subsystem: "com.taihongteng.CaptionFlow", category: "LLM")
 
 enum LLMTranslatorError: Error, Equatable {
     case emptyAPIKey
@@ -148,6 +151,9 @@ struct LLMTranslator: Translator, CaptionRefiner {
         let decoded = try JSONDecoder().decode(AnthropicMessagesResponse.self, from: data)
         guard let translated = decoded.content.first(where: { $0.type == "text" })?.text,
               !translated.isEmpty else {
+            // 只记录结束原因和内容块类型，不记录字幕内容。
+            let blocks = decoded.content.map(\.type).joined(separator: ",")
+            logger.error("Anthropic reply has no text: stop_reason=\(decoded.stopReason ?? "nil", privacy: .public) blocks=[\(blocks, privacy: .public)]")
             throw LLMTranslatorError.emptyResponse
         }
         return translated
@@ -174,6 +180,7 @@ struct LLMTranslator: Translator, CaptionRefiner {
         let decoded = try JSONDecoder().decode(OpenAIChatResponse.self, from: data)
         guard let translated = decoded.choices.first?.message.content,
               !translated.isEmpty else {
+            logger.error("OpenAI-compatible reply has no text: finish_reason=\(decoded.choices.first?.finishReason ?? "nil", privacy: .public)")
             throw LLMTranslatorError.emptyResponse
         }
         return translated
@@ -204,6 +211,12 @@ private struct AnthropicMessage: Codable {
 
 private struct AnthropicMessagesResponse: Decodable {
     let content: [ContentBlock]
+    let stopReason: String?
+
+    enum CodingKeys: String, CodingKey {
+        case content
+        case stopReason = "stop_reason"
+    }
 }
 
 private struct ContentBlock: Decodable {
@@ -227,4 +240,10 @@ private struct OpenAIChatResponse: Decodable {
 
 private struct OpenAIChoice: Decodable {
     let message: OpenAIMessage
+    let finishReason: String?
+
+    enum CodingKeys: String, CodingKey {
+        case message
+        case finishReason = "finish_reason"
+    }
 }

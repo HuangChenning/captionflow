@@ -1,4 +1,7 @@
 import Foundation
+import os
+
+private let logger = Logger(subsystem: "com.taihongteng.CaptionFlow", category: "Pipeline")
 
 @MainActor
 final class CaptionPipeline: ObservableObject {
@@ -128,6 +131,8 @@ final class CaptionPipeline: ObservableObject {
             translationError = nil
             updateCaption(id: id, chinese: chinese, isProvisional: false, refinement: .refined)
         case .failure(let error):
+            // 字幕里只显示“精修失败”，具体原因写进系统日志以便排查。
+            logger.error("LLM refinement failed: \(String(describing: error), privacy: .public)")
             // 保留临时译文；两种翻译都没有结果时只保留英文，会话继续。
             if let draft = captions.first(where: { $0.id == id })?.chinese {
                 updateCaption(id: id, chinese: draft, isProvisional: false, refinement: .failed)

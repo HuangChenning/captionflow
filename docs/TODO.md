@@ -6,6 +6,12 @@
 - [x] 在字幕中区分本地初译、LLM 精修中和 LLM 精修完成状态，并保留精修失败时的本地译文。
 - [x] 为 LLM 精修加入可解释的术语候选：显示候选来源及示例，不能自动写入长期词库。
 - [x] 提供用户确认、编辑、删除的本地术语表；确认后的术语可作为后续翻译提示的一部分。
+- [ ] 查明 LLM 精修间歇性失败的原因：2026-09-26 用 deepseek-v4-flash（Anthropic 格式）验收时，第一次 11 句中 4 句失败，请求均返回 HTTP 200；第二次 8 句全部成功。失败原因现已写入系统日志（subsystem `com.taihongteng.CaptionFlow`），需在复现后确认，例如是否为思考内容占满 1024 的 `max_tokens`。
+
+## 语音识别
+
+- [ ] 静音时不输出字幕：样本播放结束后，Whisper 每隔几秒把静音识别成 “you” 并译成“你”，既干扰显示，又每条都发出一次 LLM 请求。
+- [ ] 按语句边界切分识别结果：当前约每 3 秒切一段，会把单词和句子截断（如 “mock-” / “up”，“Microsoft Build” 被切成 “Microsoft.” 和 “built in Seattle”，后者译成“西雅图制造”），还出现过整段丢失（“will speak at Microsoft Build in Seattle”）。
 
 ## 本地翻译可用性
 
