@@ -147,6 +147,8 @@ private struct CaptionOverlayContent: View {
                     Text(caption.chinese ?? "…")
                         .font(.system(size: translationFontSize, weight: .semibold))
                         .foregroundStyle(textColor)
+                } else if let translationError = pipeline.translationError {
+                    OverlayHint(text: "翻译失败，仅显示英文：\(translationError)")
                 }
             }
             .multilineTextAlignment(.center)

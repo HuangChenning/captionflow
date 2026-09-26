@@ -27,6 +27,9 @@ final class CaptionSessionController: ObservableObject {
             .background(AppleTranslationHostView(holder: translationSessionHolder))
     )
     private var pipelineStateObservation: AnyCancellable?
+    private var readinessObservation: AnyCancellable?
+    /// 当前会话的目标语言；下载的资源语言与它一致时才切换到本地翻译。
+    private var sessionTarget: TargetLanguage?
     private let hotKeys = GlobalHotKeys()
 
     init(translationSessionHolder: TranslationSessionHolder) {
@@ -51,6 +54,11 @@ final class CaptionSessionController: ObservableObject {
         let target = UserDefaults.standard.string(forKey: "translation.targetLanguage")
             .flatMap(TargetLanguage.init(rawValue:)) ?? .simplifiedChinese
         Task { await translationSessionHolder.readiness.refresh(target: target) }
+        readinessObservation = translationSessionHolder.readiness.$state.sink { [weak self] state in
+            guard state == .installed else { return }
+            // sink 在 state 赋值前触发，放到下一轮再读取最新状态。
+            Task { @MainActor in await self?.switchToLocalTranslationIfNeeded() }
+        }
         let workspaceCenter = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
             workspaceCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
@@ -115,6 +123,7 @@ final class CaptionSessionController: ObservableObject {
     func stop() async {
         pipelineStateObservation = nil
         translationNotice = nil
+        sessionTarget = nil
         let captions = pipeline?.captions ?? []
         await pipeline?.stop()
         pipeline = nil
@@ -186,6 +195,18 @@ final class CaptionSessionController: ObservableObject {
 
     /// 自动模式下本地翻译先显示，LLM 结果到达后替换（refiner）。
     /// 本地资源未就绪时不使用本地翻译，改用 LLM 或只显示英文，并通过 translationNotice 说明原因。
+    /// 会话进行中本地资源下载完成时，之后的语音改用本地翻译，不必重新开始字幕。
+    private func switchToLocalTranslationIfNeeded() async {
+        let readiness = translationSessionHolder.readiness
+        // translationNotice 非 nil 表示本次会话因资源不可用跳过了本地翻译；切换后它会变为 nil，不会重复切换。
+        guard let pipeline, translationNotice != nil, readiness.isReady,
+              readiness.target == sessionTarget else { return }
+        let translators = await makeTranslators()
+        // makeTranslators 期间会话可能已停止或被替换。
+        guard self.pipeline === pipeline else { return }
+        pipeline.updateTranslation(translator: translators.translator, refiner: translators.refiner)
+    }
+
     private func makeTranslators() async -> (translator: Translator?, refiner: CaptionRefiner?) {
         let defaults = UserDefaults.standard
         let instruction = defaults.string(forKey: "llm.instruction")
@@ -202,6 +223,7 @@ final class CaptionSessionController: ObservableObject {
         let llmTranslator = makeLLMTranslator(instruction: instruction, targetLanguage: targetLanguage)
         let route = engineMode.route(localReady: readiness.isReady, llmAvailable: llmTranslator != nil)
         translationNotice = Self.notice(for: route, mode: engineMode, readiness: readiness.state, target: targetLanguage)
+        sessionTarget = targetLanguage
 
         let local = AppleTranslator(holder: translationSessionHolder)
         switch route {
