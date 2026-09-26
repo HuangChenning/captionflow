@@ -53,6 +53,7 @@ struct LLMTranslator: Translator, CaptionRefiner {
             prompt += "\n\nLocal draft translation (correct it if needed):\n\(localDraft)"
         }
         prompt += glossarySection(for: english)
+        prompt += possibleNamesSection(for: english)
         prompt += "\n\nReply with only the final subtitle text."
         return try await send(prompt)
     }
@@ -83,8 +84,8 @@ struct LLMTranslator: Translator, CaptionRefiner {
     private func proposeTerms(inTranscript transcript: String) async throws -> [GlossaryEntry] {
         let prompt = """
         Below is an English speech transcript with its subtitles. List domain terms, product names, \
-        and proper nouns whose translation should stay consistent in future subtitles. \
-        Use the exact English spelling from the transcript.
+        proper nouns, and recurring phrases or fixed expressions whose translation should stay consistent \
+        in future subtitles. Use the exact English spelling from the transcript.
         Reply with only a JSON array like [{"source": "English term", "target": "translation"}]. \
         Reply [] if there are none.
 
@@ -100,13 +101,31 @@ struct LLMTranslator: Translator, CaptionRefiner {
         return terms.map { GlossaryEntry(source: $0.source, target: $0.target) }
     }
 
+    /// 精修时最多附带这么多条“可能出现的名字”。只挑原文里没有原样出现的专有名词，避免每个请求都带上整个词库。
+    static let maxPossibleNames = 20
+
     /// 只附带原文里出现过的已确认术语，词库变大时不会撑大每个请求。
+    /// 原文里没有的专有名词不放这里，改由 possibleNamesSection 提示听错的名字。
     private func glossarySection(for english: String) -> String {
         let terms = glossary
             .filter { english.range(of: $0.source, options: .caseInsensitive) != nil }
             .map { "\($0.source)=\($0.target)" }
         guard !terms.isEmpty else { return "" }
         return "\n\nApproved glossary (always use these translations):\n" + terms.joined(separator: "\n")
+    }
+
+    /// 识别把人名听错时（"Lucas Rest" 听成 "Looks rest"），原文里匹配不到词条。
+    /// 把词库中有限数量的专有名词作为“可能出现的名字”附上，让模型按读音还原；普通术语不附，以免被套到无关的句子上。
+    private func possibleNamesSection(for english: String) -> String {
+        let names = glossary
+            .filter(\.isProperNoun)
+            .filter { english.range(of: $0.source, options: .caseInsensitive) == nil }
+            .prefix(Self.maxPossibleNames)
+            .map { "\($0.source)=\($0.target)" }
+        guard !names.isEmpty else { return "" }
+        return "\n\nPossible names (speech recognition may have misheard one of these; "
+            + "use a name only when the English clearly sounds like it, otherwise ignore):\n"
+            + names.joined(separator: "\n")
     }
 
     private func send(_ text: String) async throws -> String {

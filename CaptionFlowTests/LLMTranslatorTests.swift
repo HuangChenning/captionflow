@@ -44,6 +44,67 @@ final class LLMTranslatorTests: XCTestCase {
 
         XCTAssertFalse(body.contains("会议纪要"))
         XCTAssertFalse(body.contains("glossary"))
+        XCTAssertFalse(body.contains("Possible names"))
+    }
+
+    /// 识别把人名听错时原文对不上词条（"Lucas Rest" 听成 "Looks rest"）。
+    /// 精修要看到词库里的专有名词，但普通术语和全大写缩写不能跟着附上，否则会被套到无关的句子。
+    func testRefinementOffersUnmatchedProperNounsAsPossibleMishearings() async throws {
+        let body = try await capturedRequestBody(glossary: [
+            GlossaryEntry(source: "Lucas Rest", target: "卢卡斯·雷斯特"),
+            GlossaryEntry(source: "minutes", target: "会议纪要"),
+            GlossaryEntry(source: "API", target: "接口")
+        ]) {
+            try await $0.refine(english: "Looks rest will speak", localDraft: "看起来休息会发言", previousEnglish: nil)
+        }
+
+        XCTAssertTrue(body.contains("Possible names"))
+        XCTAssertTrue(body.contains("Lucas Rest=卢卡斯·雷斯特"))
+        XCTAssertTrue(body.contains("sounds like it"), "the model must not force a name that does not fit")
+        XCTAssertFalse(body.contains("会议纪要"))
+        XCTAssertFalse(body.contains("API=接口"))
+        XCTAssertFalse(body.contains("Approved glossary"))
+    }
+
+    /// 原文里已经出现的专有名词走“必须使用”的词库，不再放进可能听错的名字列表。
+    func testRefinementKeepsExactProperNounInApprovedGlossaryOnly() async throws {
+        let body = try await capturedRequestBody(glossary: [
+            GlossaryEntry(source: "Lucas Rest", target: "卢卡斯·雷斯特")
+        ]) {
+            try await $0.refine(english: "Lucas Rest will speak", localDraft: nil, previousEnglish: nil)
+        }
+
+        XCTAssertTrue(body.contains("Approved glossary"))
+        XCTAssertTrue(body.contains("Lucas Rest=卢卡斯·雷斯特"))
+        XCTAssertFalse(body.contains("Possible names"))
+    }
+
+    /// 名字列表要有上限，词库变大时精修请求不能跟着无限变长。
+    func testRefinementCapsPossibleNames() async throws {
+        let names = (0...LLMTranslator.maxPossibleNames).map { index in
+            GlossaryEntry(source: String(format: "Nomen%02d", index), target: "人名\(index)")
+        }
+        let body = try await capturedRequestBody(glossary: names) {
+            try await $0.refine(english: "hello", localDraft: nil, previousEnglish: nil)
+        }
+        let kept = String(format: "Nomen%02d", LLMTranslator.maxPossibleNames - 1)
+        let dropped = String(format: "Nomen%02d=人名%d", LLMTranslator.maxPossibleNames, LLMTranslator.maxPossibleNames)
+
+        XCTAssertTrue(body.contains("Nomen00=人名0"))
+        XCTAssertTrue(body.contains(kept))
+        XCTAssertFalse(body.contains(dropped))
+    }
+
+    /// 可能听错的名字只给精修。直接翻译不附带原文里没有出现的专有名词。
+    func testTranslateDoesNotOfferUnmatchedProperNouns() async throws {
+        let body = try await capturedRequestBody(glossary: [
+            GlossaryEntry(source: "Lucas Rest", target: "卢卡斯·雷斯特")
+        ]) {
+            try await $0.translate("Looks rest will speak")
+        }
+
+        XCTAssertFalse(body.contains("Lucas Rest"))
+        XCTAssertFalse(body.contains("Possible names"))
     }
 
     /// 仅 LLM 模式下没有精修步骤，术语要在直接翻译时生效。
@@ -188,6 +249,8 @@ final class LLMTranslatorTests: XCTestCase {
 
         XCTAssertTrue(body.contains("EN: the minutes\\nTranslation: 分钟"))
         XCTAssertTrue(body.contains("EN: no translation"))
+        XCTAssertTrue(body.contains("recurring phrases"), "extraction must include phrases, not only proper nouns")
+        XCTAssertTrue(body.contains("fixed expressions"))
     }
 
     /// 长会话要分段发送，每段不超过上限，且每句都被发送一次，不会被截掉。

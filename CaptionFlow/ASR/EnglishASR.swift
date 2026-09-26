@@ -15,8 +15,8 @@ enum SpeechRecognitionEngine: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .whisper: return "Whisper base.en（App 自带模型）"
-        case .apple: return "苹果系统识别（需要 macOS 26）"
+        case .whisper: return "Whisper"
+        case .apple: return "苹果系统识别"
         }
     }
 }

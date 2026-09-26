@@ -2,37 +2,77 @@ import Foundation
 
 /// LLM 从某次会话中提出的术语候选。只有用户采纳后才会写入已确认词库（GlossaryStore）。
 struct TermCandidate: Codable, Equatable, Identifiable {
+    /// “自定义词汇”里“从字幕历史分析”每次只看最近这么多场，避免一次请求过多。
+    static let recentAnalysisSessionLimit = 5
+
     let id: UUID
     var source: String
     var target: String
     /// 会话里包含该术语的英文原句，供用户判断候选是否合理。
     let example: String
-    /// 候选来自哪一次会话（会话开始时间）。
+    /// 候选来自哪一次会话（会话开始时间）。多场分析时取最近一场包含该术语的会话。
     let sessionDate: Date
+    /// 代码在所分析字幕里统计的出现次数。旧的候选文件没有这个字段，解码为 nil。
+    var occurrences: Int?
 
-    init(id: UUID = UUID(), source: String, target: String, example: String, sessionDate: Date) {
+    init(id: UUID = UUID(), source: String, target: String, example: String, sessionDate: Date, occurrences: Int? = nil) {
         self.id = id
         self.source = source
         self.target = target
         self.example = example
         self.sessionDate = sessionDate
+        self.occurrences = occurrences
     }
 
-    /// 把 LLM 的提议整理成候选。示例句由代码从会话原文中查找，不采用 LLM 的说法：
+    /// 把 LLM 的提议整理成候选。示例句和出现次数都由代码从会话原文统计，不采用 LLM 的说法：
     /// 在原文中找不到的术语视为 LLM 编造而丢弃；已在词库、已在候选列表或重复的术语也丢弃。
     static func make(
         from proposals: [GlossaryEntry],
         session: CaptionSession,
         excluding existingSources: [String]
     ) -> [TermCandidate] {
+        make(from: proposals, sessions: [session], excluding: existingSources)
+    }
+
+    static func make(
+        from proposals: [GlossaryEntry],
+        sessions: [CaptionSession],
+        excluding existingSources: [String]
+    ) -> [TermCandidate] {
+        let captions = sessions.flatMap(\.captions)
         var seen = Set(existingSources.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() })
         return proposals.compactMap { proposal in
             let source = proposal.source.trimmingCharacters(in: .whitespacesAndNewlines)
             let target = proposal.target.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !source.isEmpty, !target.isEmpty, seen.insert(source.lowercased()).inserted,
-                  let example = session.captions.first(where: { $0.english.range(of: source, options: .caseInsensitive) != nil })?.english
-            else { return nil }
-            return TermCandidate(source: source, target: target, example: example, sessionDate: session.createdAt)
+            guard !source.isEmpty, !target.isEmpty, seen.insert(source.lowercased()).inserted else { return nil }
+            guard let match = sessions.lazy.compactMap({ session -> (Date, String)? in
+                guard let example = session.captions.first(where: { $0.english.range(of: source, options: .caseInsensitive) != nil })?.english else {
+                    return nil
+                }
+                return (session.createdAt, example)
+            }).first else { return nil }
+            return TermCandidate(
+                source: source,
+                target: target,
+                example: match.1,
+                sessionDate: match.0,
+                occurrences: occurrenceCount(of: source, in: captions)
+            )
+        }
+    }
+
+    /// 在字幕原文中数短语出现了几次，大小写不敏感、不重叠。次数必须来自原文，不能信 LLM。
+    static func occurrenceCount(of phrase: String, in captions: [Caption]) -> Int {
+        let needle = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return 0 }
+        return captions.reduce(0) { total, caption in
+            var count = 0
+            var start = caption.english.startIndex
+            while let range = caption.english.range(of: needle, options: .caseInsensitive, range: start..<caption.english.endIndex) {
+                count += 1
+                start = range.upperBound
+            }
+            return total + count
         }
     }
 
@@ -45,9 +85,20 @@ struct TermCandidate: Codable, Equatable, Identifiable {
         glossaryStore: GlossaryStore = GlossaryStore(),
         ignoredStore: IgnoredTermStore = IgnoredTermStore()
     ) throws -> [TermCandidate] {
+        try record(proposals, from: [session], candidateStore: candidateStore, glossaryStore: glossaryStore, ignoredStore: ignoredStore)
+    }
+
+    /// 多场会话一起统计出现次数。传入顺序应为最近的在前，示例句和来源日期取最近一场包含该术语的会话。
+    static func record(
+        _ proposals: [GlossaryEntry],
+        from sessions: [CaptionSession],
+        candidateStore: TermCandidateStore = TermCandidateStore(),
+        glossaryStore: GlossaryStore = GlossaryStore(),
+        ignoredStore: IgnoredTermStore = IgnoredTermStore()
+    ) throws -> [TermCandidate] {
         let pending = try candidateStore.load()
         let existing = try glossaryStore.load().map(\.source) + pending.map(\.source) + ignoredStore.load()
-        let found = make(from: proposals, session: session, excluding: existing)
+        let found = make(from: proposals, sessions: sessions, excluding: existing)
         try candidateStore.save(pending + found)
         return found
     }

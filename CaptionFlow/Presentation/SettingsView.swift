@@ -71,26 +71,34 @@ struct SettingsView: View {
                 ShortcutSettingsPane()
             case .vocabulary:
                 VocabularySettingsPane()
-            case let other:
-                PlaceholderSettingsPane(title: other.title)
+            case .about:
+                AboutSettingsPane()
             }
         }
         .frame(width: 720, height: 480)
     }
 }
 
-private struct PlaceholderSettingsPane: View {
-    let title: String
+private struct AboutSettingsPane: View {
+    private static let repository = URL(string: "https://github.com/HuangChenning/captionflow")!
 
     var body: some View {
-        VStack(spacing: 8) {
-            Text(title)
-                .font(.title2)
-            Text("即将推出")
-                .foregroundStyle(.secondary)
+        Form {
+            Section {
+                LabeledContent("版本", value: shortVersion)
+                Text("为英文音频（视频、直播、播客、线上会议）显示实时翻译字幕。语音在本机识别，译文由你配置的大模型生成。")
+                    .foregroundStyle(.secondary)
+            }
+            Section {
+                Link("项目主页", destination: Self.repository)
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationTitle(title)
+        .formStyle(.grouped)
+        .navigationTitle("关于")
+    }
+
+    private var shortVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-"
     }
 }
 
@@ -277,6 +285,52 @@ private struct ShortcutSettingsPane: View {
     }
 }
 
+/// 选项标题旁的说明。点开后显示，不依赖系统悬停提示——设置页分区标题接不到悬停。
+private struct HintLabel<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: () -> Content
+    @State private var shown = false
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Text(title)
+            Button {
+                shown.toggle()
+            } label: {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("\(title)的说明")
+            .popover(isPresented: $shown, arrowEdge: .bottom) {
+                VStack(alignment: .leading, spacing: 10) {
+                    content()
+                }
+                .padding(12)
+                .frame(width: 232, alignment: .leading)
+            }
+        }
+    }
+}
+
+private struct HintEntry: View {
+    let title: String
+    let detail: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.callout.weight(.semibold))
+            Text(detail)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 private struct TranslationSettingsPane: View {
     @ObservedObject var holder: TranslationSessionHolder
     @AppStorage("translation.targetLanguage") private var targetLanguageRaw = TargetLanguage.simplifiedChinese.rawValue
@@ -288,15 +342,20 @@ private struct TranslationSettingsPane: View {
     var body: some View {
         Form {
             Section {
-                Picker("识别引擎", selection: $speechEngineRaw) {
+                Picker(selection: $speechEngineRaw) {
                     ForEach(SpeechRecognitionEngine.allCases) { engine in
                         Text(engine.displayName).tag(engine.rawValue)
+                    }
+                } label: {
+                    HintLabel(title: "识别引擎") {
+                        HintEntry(title: "Whisper", detail: "App 自带 base.en，只识别英文。")
+                        HintEntry(title: "苹果系统识别", detail: "模型由系统下载和管理。macOS 26 以下会改用 Whisper。")
                     }
                 }
             } header: {
                 Text("语音识别")
             } footer: {
-                Text("苹果系统识别使用系统管理的识别模型，第一次使用时由系统下载英文资源；系统低于 macOS 26 时自动改用 Whisper。修改在下次开始字幕时生效。")
+                Text("修改在下次开始字幕时生效。")
             }
             Section {
                 Picker("目标语言", selection: $targetLanguageRaw) {
@@ -304,15 +363,21 @@ private struct TranslationSettingsPane: View {
                         Text(language.displayName).tag(language.rawValue)
                     }
                 }
-                Picker("翻译方式", selection: $engineModeRaw) {
+                Picker(selection: $engineModeRaw) {
                     ForEach(TranslationEngineMode.allCases) { mode in
                         Text(mode.displayName).tag(mode.rawValue)
+                    }
+                } label: {
+                    HintLabel(title: "翻译方式") {
+                        HintEntry(title: "自动", detail: "先显示本地翻译，大模型结果到达后替换。")
+                        HintEntry(title: "仅本地", detail: "不调用大模型。")
+                        HintEntry(title: "仅大模型", detail: "不使用 Apple 本地翻译。")
                     }
                 }
             } header: {
                 Text("翻译")
             } footer: {
-                Text("决定翻译目标语言、优先使用本地翻译还是 LLM；具体模型与 API Key 在“模型”中配置。")
+                Text("具体模型与 API Key 在“模型”中配置。修改在下次开始字幕时生效。")
             }
             Section("本地翻译资源") {
                 Text(resourceMessage)
