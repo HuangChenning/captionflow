@@ -102,9 +102,9 @@ final class CaptionSessionController: ObservableObject {
         let source = sourceKind.makeSource(appBundleID: systemAudioAppBundleID)
         do {
             let stream = try await source.start()
-            let asr: WhisperKitEnglishASR
+            let asr: EnglishASR
             do {
-                asr = try await WhisperKitEnglishASR.load()
+                asr = try await Self.loadASR()
             } catch {
                 await source.stop()
                 throw error
@@ -213,6 +213,16 @@ final class CaptionSessionController: ObservableObject {
         // makeTranslators 期间会话可能已停止或被替换。
         guard self.pipeline === pipeline else { return }
         pipeline.updateTranslation(translator: translators.translator, refiner: translators.refiner)
+    }
+
+    /// 选了苹果系统识别但系统低于 macOS 26 时，改用 Whisper。
+    private static func loadASR() async throws -> EnglishASR {
+        let engine = UserDefaults.standard.string(forKey: SpeechRecognitionEngine.key)
+            .flatMap(SpeechRecognitionEngine.init(rawValue:)) ?? .whisper
+        if engine == .apple, #available(macOS 26, *) {
+            return try await AppleSpeechEnglishASR.load()
+        }
+        return try await WhisperKitEnglishASR.load()
     }
 
     private func makeTranslators() async -> (translator: Translator?, refiner: CaptionRefiner?) {
