@@ -55,6 +55,16 @@ final class LLMTranslatorTests: XCTestCase {
         XCTAssertTrue(body.contains("minutes=会议纪要"))
     }
 
+    /// 默认开启思考的模型会把 max_tokens 用在思考上、不返回译文（2026-09-26 验收中 10 句失败 5 句），所以请求要关闭思考。
+    func testAnthropicRequestDisablesThinking() async throws {
+        let body = try await capturedRequestBody(glossary: []) {
+            try await $0.refine(english: "hello", localDraft: nil)
+        }
+
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(body.utf8)) as? [String: Any])
+        XCTAssertEqual((json["thinking"] as? [String: String])?["type"], "disabled")
+    }
+
     private func capturedRequestBody(
         glossary: [GlossaryEntry],
         _ call: (LLMTranslator) async throws -> String
