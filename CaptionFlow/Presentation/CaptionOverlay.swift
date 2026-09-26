@@ -147,6 +147,11 @@ private struct CaptionOverlayContent: View {
                     Text(caption.chinese ?? "…")
                         .font(.system(size: translationFontSize, weight: .semibold))
                         .foregroundStyle(textColor)
+                    if let status = refinementStatus(caption) {
+                        Text(status)
+                            .font(.system(size: 12))
+                            .foregroundStyle(textColor.opacity(0.5))
+                    }
                 } else if let translationError = pipeline.translationError {
                     OverlayHint(text: "翻译失败，仅显示英文：\(translationError)")
                 }
@@ -158,6 +163,16 @@ private struct CaptionOverlayContent: View {
             OverlayHint(text: "字幕已中断")
         } else {
             OverlayHint(text: notice.map { "等待语音…\n\($0)" } ?? "等待语音…")
+        }
+    }
+
+    /// 区分本地初译、精修中和精修完成；没有经过精修的字幕不显示状态。
+    private func refinementStatus(_ caption: Caption) -> String? {
+        switch caption.refinement {
+        case .refining: return caption.chinese == nil ? "LLM 翻译中" : "本地初译 · LLM 精修中"
+        case .refined: return "LLM 已精修"
+        case .failed: return caption.chinese == nil ? nil : "LLM 精修失败，显示本地初译"
+        case nil: return nil
         }
     }
 }
