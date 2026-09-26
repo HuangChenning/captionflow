@@ -12,7 +12,7 @@ jobs:
   lines-of-code:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # 统计 Swift 源码和测试的代码行（不含空行和注释），生成 shields.io endpoint 徽章数据。
       - name: Count lines of code
         run: |
